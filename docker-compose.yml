@@ -13,20 +13,6 @@ services:
     command: node dist/webhook-server.js
     expose:
       - '${PORT}'
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=${TRAEFIK_NETWORK}
-      - traefik.http.routers.brainai.rule=Host(`${WEBHOOK_HOST}`) && PathPrefix(`${WEBHOOK_PATH_PREFIX}`)
-      - traefik.http.routers.brainai.entrypoints=websecure
-      - traefik.http.routers.brainai.tls=true
-      - traefik.http.routers.brainai.tls.certresolver=mytlschallenge
-      - traefik.http.routers.brainai.priority=15
-      - traefik.http.routers.brainai.middlewares=brainai-rewrite
-      - traefik.http.middlewares.brainai-rewrite.replacepathregex.regex=^${WEBHOOK_PATH_PREFIX}(/|$)(.*)
-      - traefik.http.middlewares.brainai-rewrite.replacepathregex.replacement=/$$2
-      - traefik.http.services.brainai.loadbalancer.server.port=${PORT}
-    networks:
-      - traefik
     restart: unless-stopped
     network_mode: "container:xn8n-redsocks"
 
