@@ -1,0 +1,55 @@
+version: '3.9'
+
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --api.dashboard=true
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: tg-brainai
+    environment:
+      NODE_ENV: production
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      PORT: ${PORT}
+      USE_NGROK: 'false'
+      WEBHOOK_PUBLIC_URL: ${WEBHOOK_PUBLIC_URL}
+    command: node dist/webhook-server.js
+    expose:
+      - '${PORT}'
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.brainai.rule=Host(`${WEBHOOK_HOST}`)
+      - traefik.http.routers.brainai.entrypoints=websecure
+      - traefik.http.routers.brainai.tls.certresolver=le
+      - traefik.http.services.brainai.loadbalancer.server.port=${PORT}
+      - traefik.http.routers.brainai-redirect.rule=Host(`${WEBHOOK_HOST}`)
+      - traefik.http.routers.brainai-redirect.entrypoints=web
+      - traefik.http.routers.brainai-redirect.middlewares=redirect-to-https
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+    depends_on:
+      - traefik
+    restart: unless-stopped
+
+volumes:
+  traefik_letsencrypt:
+    name: traefik_letsencrypt
+
+

@@ -1,0 +1,126 @@
+module.exports = {
+  apps: [
+    {
+      name: 'tg-brainai-bot',
+      script: 'dist/index.js',
+      cwd: './tg-brainai',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G',
+      env: {
+        NODE_ENV: 'development'
+      },
+      env_production: {
+        NODE_ENV: 'production'
+      },
+      error_file: './logs/err.log',
+      out_file: './logs/out.log',
+      log_file: './logs/combined.log',
+      time: true,
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_restarts: 10,
+      min_uptime: '10s',
+      kill_timeout: 5000,
+      listen_timeout: 8000,
+      restart_delay: 4000
+    },
+    {
+      name: 'tg-brainai-webhook',
+      script: 'dist/webhook-server.js',
+      cwd: './tg-brainai',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '512M',
+      env: {
+        NODE_ENV: 'development',
+        PORT: 3000,
+        USE_NGROK: 'false'
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        PORT: process.env.PORT || 3000,
+        USE_NGROK: 'false'
+      },
+      error_file: './logs/webhook-err.log',
+      out_file: './logs/webhook-out.log',
+      log_file: './logs/webhook-combined.log',
+      time: true,
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_restarts: 10,
+      min_uptime: '10s',
+      kill_timeout: 5000,
+      listen_timeout: 8000,
+      restart_delay: 4000
+    },
+    {
+      name: 'tg-brainai-dev',
+      script: 'tsx',
+      args: 'src/index.ts',
+      cwd: './tg-brainai',
+      instances: 1,
+      autorestart: true,
+      watch: ['src'],
+      ignore_watch: ['node_modules', 'logs', 'dist'],
+      watch_options: {
+        followSymlinks: false
+      },
+      max_memory_restart: '512M',
+      env: {
+        NODE_ENV: 'development'
+      },
+      error_file: './logs/dev-err.log',
+      out_file: './logs/dev-out.log',
+      log_file: './logs/dev-combined.log',
+      time: true,
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_restarts: 10,
+      min_uptime: '5s',
+      kill_timeout: 3000
+    },
+    {
+      name: 'tg-brainai-webhook-dev',
+      script: 'tsx',
+      args: 'src/dev-webhook.ts',
+      cwd: './tg-brainai',
+      instances: 1,
+      autorestart: true,
+      watch: ['src'],
+      ignore_watch: ['node_modules', 'logs', 'dist'],
+      watch_options: {
+        followSymlinks: false
+      },
+      max_memory_restart: '512M',
+      env: {
+        NODE_ENV: 'development',
+        PORT: 3001
+      },
+      error_file: './logs/webhook-dev-err.log',
+      out_file: './logs/webhook-dev-out.log',
+      log_file: './logs/webhook-dev-combined.log',
+      time: true,
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_restarts: 10,
+      min_uptime: '5s',
+      kill_timeout: 3000
+    }
+  ],
+
+  deploy: {
+    production: {
+      user: 'node',
+      host: 'mugukamil.fvds.ru',
+      ref: 'origin/main',
+      repo: 'git@github.com:mugukamil/tg-brainai.git',
+      path: '/var/www/tg-brainai',
+      'pre-deploy-local': '',
+      'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env production',
+      'pre-setup': ''
+    }
+  }
+};
