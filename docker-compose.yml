@@ -28,6 +28,8 @@ services:
     networks:
       - traefik
     restart: unless-stopped
+    network_mode: "container:xn8n-redsocks"
+
 
 networks:
   traefik:
