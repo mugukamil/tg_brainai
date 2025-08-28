@@ -2,6 +2,8 @@ services:
   app:
     build: .
     container_name: tg-brainai
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
@@ -14,10 +16,14 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${TRAEFIK_NETWORK}
-      - traefik.http.routers.brainai.rule=Host(`${WEBHOOK_HOST}`)
+      - traefik.http.routers.brainai.rule=Host(`${WEBHOOK_HOST}`) && PathPrefix(`${WEBHOOK_PATH_PREFIX}`)
       - traefik.http.routers.brainai.entrypoints=websecure
       - traefik.http.routers.brainai.tls=true
       - traefik.http.routers.brainai.tls.certresolver=mytlschallenge
+      - traefik.http.routers.brainai.priority=15
+      - traefik.http.routers.brainai.middlewares=brainai-rewrite
+      - traefik.http.middlewares.brainai-rewrite.replacepathregex.regex=^${WEBHOOK_PATH_PREFIX}(/|$)(.*)
+      - traefik.http.middlewares.brainai-rewrite.replacepathregex.replacement=/$$2
       - traefik.http.services.brainai.loadbalancer.server.port=${PORT}
     networks:
       - traefik
