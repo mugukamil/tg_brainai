@@ -104,39 +104,53 @@ export class WebhookHandler implements WebhookHandler {
   }
 
   private setupRoutes(): void {
-    // Health check endpoint
-    this.app.get('/health', async () => {
-      return {
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        webhook: this.webhookUrl,
-        ngrok: this.ngrokUrl,
-      };
-    });
+    const rawPrefix = process.env.WEBHOOK_PATH_PREFIX || "";
+    const basePrefix =
+        rawPrefix && rawPrefix !== "/" ? `/${rawPrefix.replace(/^\/+|\/+$/g, "")}` : "";
 
-    // Main webhook endpoint
-    this.app.post('/webhook', async (request: any) => {
-      const update = request.body;
-      try {
-        await this.processUpdate(update);
-        return { ok: true };
-      } catch (error) {
-        console.error('Webhook processing error:', error);
-        throw error;
-      }
-    });
+    const registerRoutes = (prefix: string) => {
+        // Health check endpoint
+        this.app.get(`${prefix}/health`, async () => {
+            return {
+                status: "ok",
+                timestamp: new Date().toISOString(),
+                webhook: this.webhookUrl,
+                ngrok: this.ngrokUrl,
+            };
+        });
 
-    // API docs endpoint
-    this.app.get('/docs', async () => {
-      return {
-        message: 'BrainAI Bot Webhook API',
-        endpoints: {
-          'GET /health': 'Health check',
-          'POST /webhook': 'Telegram webhook',
-          'GET /docs': 'This documentation',
-        },
-      };
-    });
+        // Main webhook endpoint
+        this.app.post(`${prefix}/webhook`, async (request: any) => {
+            const update = request.body;
+            try {
+                await this.processUpdate(update);
+                return { ok: true };
+            } catch (error) {
+                console.error("Webhook processing error:", error);
+                throw error;
+            }
+        });
+
+        // API docs endpoint
+        this.app.get(`${prefix}/docs`, async () => {
+            return {
+                message: "BrainAI Bot Webhook API",
+                endpoints: {
+                    "GET /health": "Health check",
+                    "POST /webhook": "Telegram webhook",
+                    "GET /docs": "This documentation",
+                },
+            };
+        });
+    };
+
+    // Register at root (no prefix)
+    registerRoutes("");
+
+    // Also register with base prefix if provided (for reverse proxies)
+    if (basePrefix) {
+        registerRoutes(basePrefix);
+    }
   }
 
   private async processUpdate(update: any): Promise<void> {
