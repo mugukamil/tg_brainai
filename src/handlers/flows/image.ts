@@ -75,99 +75,146 @@ export async function handlePhotoGeneration(
     let attempts = 0;
 
     const pollInterval = setInterval(async () => {
-      try {
-        attempts++;
-        const statusResult = await getTaskStatus(taskId);
-        if (!statusResult.success) {
-          clearInterval(pollInterval);
-          await safeEditMessageText(
-            bot,
-            chatId,
-            statusMsg.message_id,
-            `❌ Ошибка при проверке статуса: ${statusResult.error?.message}`,
-          );
-          return;
-        }
-
-        const taskData = statusResult.data?.data;
-        if (!taskData) return;
-        const currentStatus = taskData.status;
-        const progress = taskData.output?.progress || 0;
-
-        if (currentStatus !== lastStatus || progress > 0) {
-          lastStatus = currentStatus;
-          await safeEditMessageText(
-            bot,
-            chatId,
-            statusMsg.message_id,
-            formatImageStatus(currentStatus, progress),
-          );
-        }
-
-        if (currentStatus === 'completed') {
-          clearInterval(pollInterval);
-          const imageUrl = taskData.output.image_url;
-          if (imageUrl) {
-            try {
-              const { buffer, filename, contentType } = await fetchImageBuffer(imageUrl);
-              const fileOptions: any = contentType ? { filename, contentType } : { filename };
-              await bot.sendPhoto(
-                chatId,
-                buffer,
-                {
-                  caption: `Сгенерированное изображение: "${params.prompt}"\nСоотношение сторон: ${params.aspect_ratio}\nРежим: ${params.process_mode}`,
-                  reply_markup: {
-                    inline_keyboard: [
-                      [
-                        { text: '1', callback_data: JSON.stringify({ t_id: taskId, idx: 1 }) },
-                        { text: '2', callback_data: JSON.stringify({ t_id: taskId, idx: 2 }) },
-                        { text: '3', callback_data: JSON.stringify({ t_id: taskId, idx: 3 }) },
-                        { text: '4', callback_data: JSON.stringify({ t_id: taskId, idx: 4 }) },
-                      ],
-                    ],
-                  },
-                },
-                fileOptions,
-              );
-            } catch (e) {
-              await bot.sendPhoto(chatId, imageUrl, {
-                caption: `Сгенерированное изображение: "${params.prompt}"\nСоотношение сторон: ${params.aspect_ratio}\nРежим: ${params.process_mode}`,
-              });
+        try {
+            attempts++;
+            const statusResult = await getTaskStatus(taskId);
+            if (!statusResult.success) {
+                clearInterval(pollInterval);
+                await safeEditMessageText(
+                    bot,
+                    chatId,
+                    statusMsg.message_id,
+                    `❌ Ошибка при проверке статуса: ${statusResult.error?.message}`,
+                );
+                return;
             }
-            await logInteraction({ userId: userId!, chatId, direction: 'bot', type: 'image', content: imageUrl, meta: { prompt: params.prompt, aspect_ratio: params.aspect_ratio, mode: params.process_mode } });
-            try {
-              await bot.deleteMessage(chatId, statusMsg.message_id);
-            } catch {}
-            await decreaseRequests(userId, 'image_req_left', 1);
-            await bot.sendMessage(chatId, 'Выберите номер изображения 1-4👇', {
-              reply_markup: createMainKeyboard(),
-            });
-          } else {
+
+            const taskData = statusResult.data?.data;
+            if (!taskData) return;
+            const currentStatus = taskData.status;
+            const progress = taskData.output?.progress || 0;
+
+            if (currentStatus !== lastStatus || progress > 0) {
+                lastStatus = currentStatus;
+                await safeEditMessageText(
+                    bot,
+                    chatId,
+                    statusMsg.message_id,
+                    formatImageStatus(currentStatus, progress),
+                );
+            }
+
+            if (currentStatus === "completed") {
+                clearInterval(pollInterval);
+                const imageUrl = taskData.output.image_url;
+                if (imageUrl) {
+                    try {
+                        const { buffer, filename, contentType } = await fetchImageBuffer(imageUrl);
+                        const fileOptions: any = contentType
+                            ? { filename, contentType }
+                            : { filename };
+                        await bot.sendPhoto(
+                            chatId,
+                            buffer,
+                            {
+                                caption: `Сгенерированное изображение: "${params.prompt}"\nСоотношение сторон: ${params.aspect_ratio}\nРежим: ${params.process_mode}`,
+                                reply_markup: {
+                                    inline_keyboard: [
+                                        [
+                                            {
+                                                text: "1",
+                                                callback_data: JSON.stringify({
+                                                    t_id: taskId,
+                                                    idx: 1,
+                                                }),
+                                            },
+                                            {
+                                                text: "2",
+                                                callback_data: JSON.stringify({
+                                                    t_id: taskId,
+                                                    idx: 2,
+                                                }),
+                                            },
+                                            {
+                                                text: "3",
+                                                callback_data: JSON.stringify({
+                                                    t_id: taskId,
+                                                    idx: 3,
+                                                }),
+                                            },
+                                            {
+                                                text: "4",
+                                                callback_data: JSON.stringify({
+                                                    t_id: taskId,
+                                                    idx: 4,
+                                                }),
+                                            },
+                                        ],
+                                    ],
+                                },
+                            },
+                            fileOptions,
+                        );
+                    } catch (e) {
+                        await bot.sendPhoto(chatId, imageUrl, {
+                            caption: `Сгенерированное изображение: "${params.prompt}"\nСоотношение сторон: ${params.aspect_ratio}\nРежим: ${params.process_mode}`,
+                        });
+                    }
+                    await logInteraction({
+                        userId: userId!,
+                        chatId,
+                        direction: "bot",
+                        type: "image",
+                        content: imageUrl,
+                        meta: {
+                            prompt: params.prompt,
+                            aspect_ratio: params.aspect_ratio,
+                            mode: params.process_mode,
+                        },
+                    });
+                    try {
+                        await bot.deleteMessage(chatId, statusMsg.message_id);
+                    } catch {}
+                    await decreaseRequests(userId, "image_req_left", 1);
+                    await bot.sendMessage(chatId, "Выберите номер изображения 1-4👇", {
+                        reply_markup: createMainKeyboard(),
+                    });
+                } else {
+                    await safeEditMessageText(
+                        bot,
+                        chatId,
+                        statusMsg.message_id,
+                        "❌ Генерация изображения завершена, но URL-адрес изображения не получен.",
+                    );
+                }
+            } else if (currentStatus === "failed") {
+                clearInterval(pollInterval);
+                await safeEditMessageText(
+                    bot,
+                    chatId,
+                    statusMsg.message_id,
+                    "❌ Ошибка попробуйте другой запрос",
+                );
+            } else if (attempts >= maxAttempts) {
+                clearInterval(pollInterval);
+                await safeEditMessageText(
+                    bot,
+                    chatId,
+                    statusMsg.message_id,
+                    "⏰ Время генерации истекло. Попробуйте ещё раз, используя более простую подсказку.",
+                );
+            }
+        } catch (error) {
+            clearInterval(pollInterval);
+            console.error("Ошибка в polling:", error);
             await safeEditMessageText(
-              bot,
-              chatId,
-              statusMsg.message_id,
-              '❌ Генерация изображения завершена, но URL-адрес изображения не получен.',
+                bot,
+                chatId,
+                statusMsg.message_id,
+                "❌ Ошибка при мониторинге прогресса генерации.",
             );
-          }
-        } else if (currentStatus === 'failed') {
-          clearInterval(pollInterval);
-          await safeEditMessageText(bot, chatId, statusMsg.message_id, '❌ Ошибка попробуйте другой запрос');
-        } else if (attempts >= maxAttempts) {
-          clearInterval(pollInterval);
-          await safeEditMessageText(
-            bot,
-            chatId,
-            statusMsg.message_id,
-            '⏰ Время генерации истекло. Попробуйте ещё раз, используя более простую подсказку.',
-          );
         }
-      } catch (error) {
-        clearInterval(pollInterval);
-        console.error('Ошибка в polling:', error);
-        await safeEditMessageText(bot, chatId, statusMsg.message_id, '❌ Ошибка при мониторинге прогресса генерации.');
-      }
-    }, 5000);
+    }, 10000);
   } catch (error) {
     console.error('Ошибка в handlePhotoGeneration:', error);
     await safeEditMessageText(bot, chatId, statusMsg.message_id, '❌ Неожиданная ошибка при генерации изображения.');
