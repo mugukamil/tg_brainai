@@ -23,7 +23,7 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            cd "${{ secrets.PROJECT_DIR }}"
+            cd "/opt/tg-brainai"
             git fetch --all --prune
             git reset --hard origin/main
             docker compose pull || true
