@@ -79,9 +79,16 @@ export async function handleCallbackQuery(
                 const fileOptions: any = contentType
                   ? { filename, contentType }
                   : { filename };
-                await bot.sendPhoto(chatId, buffer, { caption: `✅ Upscaled image ${index}` }, fileOptions);
+                await bot.sendPhoto(
+                    chatId,
+                    buffer,
+                    { caption: `✅ Улучшенное изображение ${index}` },
+                    fileOptions,
+                );
               } catch {
-                await bot.sendPhoto(chatId, imageUrl, { caption: `✅ Upscaled image ${index}` });
+                await bot.sendPhoto(chatId, imageUrl, {
+                    caption: `✅ Улучшенное изображение ${index}`,
+                });
               }
               await logInteraction({ userId, chatId, direction: 'bot', type: 'image', content: imageUrl, meta: { upscaledIndex: index } });
               try { await bot.deleteMessage(chatId, statusMsg.message_id); } catch {}
