@@ -1,8 +1,7 @@
 import type { TelegramLikeBot as TelegramBot } from '../../tg-client.js';
 import { isAvailable as isVideoAvailable, parseVideoCommand, validateParams as validateVideoParams, generateVideo, getPredictionStatus } from '../video-handler.js';
-import { decreaseRequests, hasRequestsLeft } from '../supabase-handler.js';
-import { safeEditMessageText } from '../handler-utils.js';
-import { findUser } from '../supabase-handler.js';
+import { decreaseRequests, canConsumeRequest } from "../supabase-handler.js";
+import { safeEditMessageText } from "../handler-utils.js";
 import { logInteraction } from "../../utils/logger.js";
 
 export async function handleVideoGeneration(bot: TelegramBot, msg: any): Promise<void> {
@@ -18,8 +17,7 @@ export async function handleVideoGeneration(bot: TelegramBot, msg: any): Promise
     }
     const userId = msg.from?.id;
     if (!userId) return;
-    const user = await findUser(userId);
-    const canUse = hasRequestsLeft(user, "video_req_left" as any);
+    const canUse = await canConsumeRequest(userId, "video_req_left" as any);
     if (!canUse) {
         await bot.sendMessage(
             chatId,
@@ -91,7 +89,7 @@ export async function handleVideoGeneration(bot: TelegramBot, msg: any): Promise
                     clearInterval(timer);
                     const url = Array.isArray(st.data?.output) ? st.data?.output[0] : undefined;
                     if (url) {
-                        await (bot as any).sendVideo(chatId, url, {
+                        await bot.sendVideo(chatId, url, {
                             caption: `Видео по запросу: ${params.prompt}`,
                         });
                         await logInteraction({
@@ -107,6 +105,14 @@ export async function handleVideoGeneration(bot: TelegramBot, msg: any): Promise
                             await bot.deleteMessage(chatId, statusMsg.message_id);
                         } catch {}
                     } else {
+                        await logInteraction({
+                            userId: userId!,
+                            chatId,
+                            direction: "bot",
+                            type: "video",
+                            content: "✅ Видео готово, но URL не получен.",
+                            meta: { prompt: params.prompt },
+                        });
                         await safeEditMessageText(
                             bot,
                             chatId,
@@ -115,6 +121,14 @@ export async function handleVideoGeneration(bot: TelegramBot, msg: any): Promise
                         );
                     }
                 } else if (status === "failed") {
+                    await logInteraction({
+                        userId: userId!,
+                        chatId,
+                        direction: "bot",
+                        type: "video",
+                        content: "❌ Задача не выполнена. Попробуйте другой запрос.",
+                        meta: { prompt: params.prompt },
+                    });
                     clearInterval(timer);
                     await safeEditMessageText(
                         bot,
@@ -131,7 +145,15 @@ export async function handleVideoGeneration(bot: TelegramBot, msg: any): Promise
                         "⏰ Тайм-аут ожидания видео. Попробуйте снова.",
                     );
                 }
-            } catch (e) {
+            } catch (e: any) {
+                console.log(e);
+                await logInteraction({
+                    userId: userId!,
+                    chatId,
+                    direction: "bot",
+                    type: "video",
+                    content: e.message,
+                });
                 clearInterval(timer);
                 await safeEditMessageText(
                     bot,

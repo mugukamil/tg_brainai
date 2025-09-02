@@ -37,184 +37,272 @@ export type EventName =
   | 'webhook_error';
 
 export class TgBotAdapter {
-  private client: TelegramClient;
+    private client: TelegramClient;
 
-  constructor(token: string) {
-    const TG: any = TelegramClient;
-    if (!TG) throw new Error('TelegramsJS export TelegramBot not found');
-    this.client = new TG(token);
-  }
-
-  on(event: EventName, handler: (payload: any) => void): void {
-    if (event === 'message') {
-      this.client.on('message', (m: any) => handler(this.mapMessage(m)) as any);
-      return;
+    constructor(token: string) {
+        const TG: any = TelegramClient;
+        if (!TG) throw new Error("TelegramsJS export TelegramBot not found");
+        this.client = new TG(token);
     }
-    if (event === 'callbackQuery' || event === 'callback_query') {
-      this.client.on('callbackQuery', (q: any) => handler(this.mapCallbackQuery(q)) as any);
-      return;
+
+    on(event: EventName, handler: (payload: any) => void): void {
+        if (event === "message") {
+            this.client.on("message", (m: any) => handler(this.mapMessage(m)) as any);
+            return;
+        }
+        if (event === "callbackQuery" || event === "callback_query") {
+            this.client.on("callbackQuery", (q: any) => handler(this.mapCallbackQuery(q)) as any);
+            return;
+        }
+        if (event === "preCheckoutQuery" || event === "pre_checkout_query") {
+            this.client.on(
+                "preCheckoutQuery",
+                (q: any) => handler(this.mapPreCheckoutQuery(q)) as any,
+            );
+            return;
+        }
+        if (event === "inlineQuery" || event === "inline_query") {
+            this.client.on("inlineQuery", handler as any);
+            return;
+        }
+        if (event === "chosenInlineResult" || event === "chosen_inline_result") {
+            this.client.on("chosenInlineResult", handler as any);
+            return;
+        }
+        if (event === "channelPost" || event === "channel_post") {
+            this.client.on("channelPost", handler as any);
+            return;
+        }
+        if (event === "editedMessage" || event === "edited_message") {
+            this.client.on("editedMessage", handler as any);
+            return;
+        }
+        if (event === "polling_error" || event === "webhook_error") {
+            this.client.on("error", handler as any);
+            return;
+        }
+        this.client.on(event as any, handler as any);
     }
-    if (event === 'preCheckoutQuery' || event === 'pre_checkout_query') {
-      this.client.on('preCheckoutQuery', (q: any) => handler(this.mapPreCheckoutQuery(q)) as any);
-      return;
+
+    async sendMessage(chatId: number, text: string, options?: any): Promise<TgMessage> {
+        const MAX_TG_MESSAGE_LENGTH = 4096;
+        const fullText = typeof text === "string" ? text : String(text ?? "");
+
+        const sendChunk = async (chunk: string, includeReplyMarkup: boolean) => {
+            const raw = await this.client.sendMessage({
+                chatId,
+                text: chunk,
+                parseMode: options?.parse_mode,
+                replyMarkup: includeReplyMarkup ? options?.reply_markup : undefined,
+            } as any);
+            return this.mapMessage(raw);
+        };
+
+        if (fullText.length <= MAX_TG_MESSAGE_LENGTH) {
+            return await sendChunk(fullText, true);
+        }
+
+        const chunks: string[] = [];
+        let index = 0;
+        while (index < fullText.length) {
+            let end = Math.min(index + MAX_TG_MESSAGE_LENGTH, fullText.length);
+            if (end < fullText.length) {
+                let splitAt = fullText.lastIndexOf("\n", end - 1);
+                if (splitAt < index) {
+                    splitAt = fullText.lastIndexOf(" ", end - 1);
+                }
+                if (splitAt >= index + 1000) {
+                    end = splitAt + 1;
+                }
+            }
+            chunks.push(fullText.slice(index, end));
+            index = end;
+        }
+
+        let lastMessage: TgMessage | undefined;
+        for (let i = 0; i < chunks.length; i++) {
+            lastMessage = await sendChunk(chunks[i]!, i === 0);
+        }
+        return lastMessage!;
     }
-    if (event === 'inlineQuery' || event === 'inline_query') {
-      this.client.on('inlineQuery', handler as any);
-      return;
+
+    async sendPhoto(
+        chatId: number,
+        data: Buffer | string,
+        options?: any,
+        _fileOptions?: { filename?: string; contentType?: string },
+    ): Promise<TgMessage> {
+        const msg = await this.client.sendPhoto({
+            chatId,
+            photo: data as any,
+            caption: options?.caption,
+            replyMarkup: options?.reply_markup,
+        } as any);
+        return this.mapMessage(msg);
     }
-    if (event === 'chosenInlineResult' || event === 'chosen_inline_result') {
-      this.client.on('chosenInlineResult', handler as any);
-      return;
+
+    async sendVideo(
+        chatId: number,
+        data: Buffer | string,
+        options?: any,
+        _fileOptions?: { filename?: string; contentType?: string },
+    ): Promise<TgMessage> {
+        const msg = await this.client.sendVideo({
+            chatId,
+            video: data as any,
+            caption: options?.caption,
+            replyMarkup: options?.reply_markup,
+        } as any);
+        return this.mapMessage(msg);
     }
-    if (event === 'channelPost' || event === 'channel_post') {
-      this.client.on('channelPost', handler as any);
-      return;
+
+    async sendChatAction(chatId: number, action: ChatAction): Promise<void> {
+        await this.client.sendChatAction({ chatId, action: action as any } as any);
     }
-    if (event === 'editedMessage' || event === 'edited_message') {
-      this.client.on('editedMessage', handler as any);
-      return;
+
+    async getFileLink(fileId: string): Promise<string> {
+        const file: any = await this.client.getFile(fileId);
+        const token = (this.client as any).token;
+        const filePath: string = file?.file_path || file?.filePath || file?.file?.file_path || "";
+        return `https://api.telegram.org/file/bot${token}/${filePath}`;
     }
-    if (event === 'polling_error' || event === 'webhook_error') {
-      this.client.on('error', handler as any);
-      return;
+
+    async editMessageText(
+        text: string,
+        params: { chat_id: number; message_id: number },
+    ): Promise<void> {
+        await this.client.editMessageText({
+            chatId: params.chat_id,
+            messageId: params.message_id,
+            text,
+        } as any);
     }
-    this.client.on(event as any, handler as any);
-  }
 
-  async sendMessage(chatId: number, text: string, options?: any): Promise<TgMessage> {
-    const msg = await this.client.sendMessage({
-      chatId,
-      text,
-      parseMode: options?.parse_mode,
-      replyMarkup: options?.reply_markup,
-    } as any);
-    return this.mapMessage(msg);
-  }
+    async deleteMessage(chatId: number, messageId: number): Promise<void> {
+        await this.client.deleteMessage(chatId, messageId);
+    }
 
-  async sendPhoto(
-    chatId: number,
-    data: Buffer | string,
-    options?: any,
-    _fileOptions?: { filename?: string; contentType?: string },
-  ): Promise<TgMessage> {
-    const msg = await this.client.sendPhoto({
-      chatId,
-      photo: data as any,
-      caption: options?.caption,
-      replyMarkup: options?.reply_markup,
-    } as any);
-    return this.mapMessage(msg);
-  }
+    async answerCallbackQuery(
+        id: string,
+        options?: { text?: string; show_alert?: boolean },
+    ): Promise<void> {
+        await this.client.answerCallbackQuery({
+            callbackQueryId: id,
+            text: options?.text,
+            showAlert: options?.show_alert,
+        } as any);
+    }
 
-  async sendChatAction(chatId: number, action: ChatAction): Promise<void> {
-    await this.client.sendChatAction({ chatId, action: action as any } as any);
-  }
+    async answerPreCheckoutQuery(
+        id: string,
+        ok: boolean,
+        options?: { error_message?: string },
+    ): Promise<void> {
+        await this.client.answerPreCheckoutQuery({
+            preCheckoutQueryId: id,
+            ok,
+            errorMessage: options?.error_message,
+        } as any);
+    }
 
-  async getFileLink(fileId: string): Promise<string> {
-    const file: any = await this.client.getFile(fileId);
-    const token = (this.client as any).token;
-    const filePath: string = file?.file_path || file?.filePath || file?.file?.file_path || '';
-    return `https://api.telegram.org/file/bot${token}/${filePath}`;
-  }
+    async answerShippingQuery(
+        id: string,
+        ok: boolean,
+        options?: { error_message?: string },
+    ): Promise<void> {
+        await this.client.answerShippingQuery({
+            shippingQueryId: id,
+            ok,
+            errorMessage: options?.error_message,
+        } as any);
+    }
 
-  async editMessageText(text: string, params: { chat_id: number; message_id: number }): Promise<void> {
-    await this.client.editMessageText({ chatId: params.chat_id, messageId: params.message_id, text } as any);
-  }
+    async answerInlineQuery(id: string, results: any[], options?: any): Promise<void> {
+        await this.client.answerInlineQuery({
+            inlineQueryId: id,
+            results,
+            ...(options || {}),
+        } as any);
+    }
 
-  async deleteMessage(chatId: number, messageId: number): Promise<void> {
-    await this.client.deleteMessage(chatId, messageId);
-  }
+    async sendInvoice(
+        chatId: number,
+        title: string,
+        description: string,
+        payload: string,
+        providerToken: string,
+        currency: string,
+        prices: Array<{ label: string; amount: number }>,
+        options?: any,
+    ): Promise<void> {
+        await (this.client as any).payments?.sendInvoice?.(chatId, {
+            title,
+            description,
+            payload,
+            provider_token: providerToken,
+            currency,
+            prices,
+            ...options,
+        });
+    }
 
-  async answerCallbackQuery(id: string, options?: { text?: string; show_alert?: boolean }): Promise<void> {
-    await this.client.answerCallbackQuery({ callbackQueryId: id, text: options?.text, showAlert: options?.show_alert } as any);
-  }
+    async getMe(): Promise<{ id: number; username?: string; first_name?: string }> {
+        const user = await this.client.getMe();
+        const u = user as unknown as User;
+        return {
+            id: (u as any).id,
+            username: (u as any).username,
+            first_name: (u as any).first_name,
+        } as any;
+    }
 
-  async answerPreCheckoutQuery(
-    id: string,
-    ok: boolean,
-    options?: { error_message?: string },
-  ): Promise<void> {
-    await this.client.answerPreCheckoutQuery({ preCheckoutQueryId: id, ok, errorMessage: options?.error_message } as any);
-  }
+    async getWebHookInfo(): Promise<{ url?: string }> {
+        const info: any = await (this.client as any).getWebhookInfo?.();
+        return { url: info?.url } as any;
+    }
 
-  async answerShippingQuery(
-    id: string,
-    ok: boolean,
-    options?: { error_message?: string },
-  ): Promise<void> {
-    await this.client.answerShippingQuery({ shippingQueryId: id, ok, errorMessage: options?.error_message } as any);
-  }
+    async setWebHook(url: string): Promise<boolean> {
+        await (this.client as any).setWebhook?.({ url });
+        return true;
+    }
 
-  async answerInlineQuery(id: string, results: any[], options?: any): Promise<void> {
-    await this.client.answerInlineQuery({ inlineQueryId: id, results, ...(options || {}) } as any);
-  }
+    async deleteWebHook(): Promise<void> {
+        await (this.client as any).deleteWebhook?.(false);
+    }
 
-  async sendInvoice(
-    chatId: number,
-    title: string,
-    description: string,
-    payload: string,
-    providerToken: string,
-    currency: string,
-    prices: Array<{ label: string; amount: number }>,
-    options?: any,
-  ): Promise<void> {
-    await (this.client as any).payments?.sendInvoice?.(chatId, {
-      title,
-      description,
-      payload,
-      provider_token: providerToken,
-      currency,
-      prices,
-      ...options,
-    });
-  }
+    login(): void {
+        this.client.login();
+    }
 
-  async getMe(): Promise<{ id: number; username?: string; first_name?: string }> {
-    const user = await this.client.getMe();
-    const u = user as unknown as User;
-    return { id: (u as any).id, username: (u as any).username, first_name: (u as any).first_name } as any;
-  }
+    stopPolling(): Promise<void> {
+        return Promise.resolve();
+    }
 
-  async getWebHookInfo(): Promise<{ url?: string }> {
-    const info: any = await (this.client as any).getWebhookInfo?.();
-    return { url: info?.url } as any;
-  }
+    private mapMessage(m: any): TgMessage {
+        const msg: any = { ...m };
+        msg.message_id = msg.message_id ?? msg.id ?? msg.messageId;
+        msg.text = msg.text ?? msg.content ?? undefined;
+        msg.caption = msg.caption ?? undefined;
+        msg.chat = msg.chat ?? { id: msg.chatId ?? msg.chat?.id };
+        msg.from =
+            msg.from ??
+            (msg.author
+                ? {
+                      id: msg.author.id,
+                      username: msg.author.username,
+                      first_name: msg.author.firstName,
+                  }
+                : undefined);
+        return msg as TgMessage;
+    }
 
-  async setWebHook(url: string): Promise<boolean> {
-    await (this.client as any).setWebhook?.({ url });
-    return true;
-  }
+    private mapCallbackQuery(q: any): TgCallbackQuery {
+        return q as TgCallbackQuery;
+    }
 
-  async deleteWebHook(): Promise<void> {
-    await (this.client as any).deleteWebhook?.(false);
-  }
-
-  login(): void {
-    this.client.login();
-  }
-
-  stopPolling(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  private mapMessage(m: any): TgMessage {
-    const msg: any = { ...m };
-    msg.message_id = msg.message_id ?? msg.id ?? msg.messageId;
-    msg.text = msg.text ?? msg.content ?? undefined;
-    msg.caption = msg.caption ?? undefined;
-    msg.chat = msg.chat ?? { id: msg.chatId ?? msg.chat?.id };
-    msg.from = msg.from ?? (msg.author ? { id: msg.author.id, username: msg.author.username, first_name: msg.author.firstName } : undefined);
-    return msg as TgMessage;
-  }
-
-  private mapCallbackQuery(q: any): TgCallbackQuery {
-    return q as TgCallbackQuery;
-  }
-
-  private mapPreCheckoutQuery(q: any): TgPreCheckoutQuery {
-    return q as TgPreCheckoutQuery;
-  }
+    private mapPreCheckoutQuery(q: any): TgPreCheckoutQuery {
+        return q as TgPreCheckoutQuery;
+    }
 }
 
 export type TelegramLikeBot = TgBotAdapter;
