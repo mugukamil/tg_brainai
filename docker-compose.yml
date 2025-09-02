@@ -8,16 +8,13 @@ services:
       NODE_ENV: production
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       PORT: ${PORT}
-      USE_NGROK: 'false'
+      USE_NGROK: "false"
       WEBHOOK_PUBLIC_URL: ${WEBHOOK_PUBLIC_URL}
     command: node dist/webhook-server.js
     restart: unless-stopped
     network_mode: "container:xn8n-redsocks"
 
-
 networks:
   traefik:
     external: true
     name: ${TRAEFIK_NETWORK}
-
-
