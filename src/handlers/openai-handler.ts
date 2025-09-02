@@ -30,91 +30,98 @@ export async function transcribeAudio(fileUrl: string): Promise<TranscriptionRes
 }
 
 export async function analyzeImage(imageUrl: string, caption?: string): Promise<string> {
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4-vision-preview',
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: caption || 'Describe this image.' },
-          {
-            type: 'image_url',
-            image_url: { url: imageUrl },
-          },
+    const response = await openai.chat.completions.create({
+        model: "gpt-4-vision-preview",
+        messages: [
+            {
+                role: "system",
+                content:
+                    "Respond in Russian unless the user asks otherwise. Keep the answer under 3500 characters.",
+            },
+            {
+                role: "user",
+                content: [
+                    { type: "text", text: caption || "Describe this image." },
+                    {
+                        type: "image_url",
+                        image_url: { url: imageUrl },
+                    },
+                ],
+            },
         ],
-      },
-    ],
-  });
+        max_tokens: 900,
+    });
 
-  return response.choices[0]?.message?.content || 'Описание отсутствует.';
+    return response.choices[0]?.message?.content || "Описание отсутствует.";
 }
 
 export async function createThread(): Promise<{ id: string }> {
-  // Generate a simple thread ID for conversation tracking
-  const threadId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate a simple thread ID for conversation tracking
+    const threadId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  // Initialize conversation with system message
-  conversationHistory.set(threadId, [
-    {
-      role: 'system',
-      content:
-        'You are a helpful AI assistant. Respond in Russian unless the user specifically asks for another language. Be conversational and helpful.',
-    },
-  ]);
+    // Initialize conversation with system message
+    conversationHistory.set(threadId, [
+        {
+            role: "system",
+            content:
+                "You are a helpful AI assistant. Respond in Russian unless the user specifically asks for another language. Be conversational and helpful. Keep each answer under 3500 characters.",
+        },
+    ]);
 
-  return { id: threadId };
+    return { id: threadId };
 }
 
 export async function createMessage(threadId: string, content: string): Promise<{ id: string }> {
-  // Add user message to conversation history
-  const conversation = conversationHistory.get(threadId) || [];
-  conversation.push({
-    role: 'user',
-    content: content,
-  });
+    // Add user message to conversation history
+    const conversation = conversationHistory.get(threadId) || [];
+    conversation.push({
+        role: "user",
+        content: content,
+    });
 
-  if (conversation.length > 10) {
-    const systemMessage = conversation[0]!;
-    const recentMessages = conversation.slice(-9);
-    conversationHistory.set(threadId, [systemMessage, ...recentMessages]);
-  } else {
-    conversationHistory.set(threadId, conversation);
-  }
+    if (conversation.length > 10) {
+        const systemMessage = conversation[0]!;
+        const recentMessages = conversation.slice(-9);
+        conversationHistory.set(threadId, [systemMessage, ...recentMessages]);
+    } else {
+        conversationHistory.set(threadId, conversation);
+    }
 
-  const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  return { id: messageId };
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return { id: messageId };
 }
 
 export async function getAssistantResponse(threadId: string): Promise<string> {
-  const conversation = conversationHistory.get(threadId) || [];
+    const conversation = conversationHistory.get(threadId) || [];
 
-  if (!conversation) {
-    throw new Error('Thread not found');
-  }
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-5-mini',
-      messages: conversation as any,
-    });
-
-    const assistantMessage = response.choices[0]?.message?.content ?? '';
-
-    if (!assistantMessage) {
-      return 'Извините, не удалось получить ответ. Попробуйте еще раз.';
+    if (!conversation) {
+        throw new Error("Thread not found");
     }
 
-    // Add assistant response to conversation history
-    conversation.push({
-      role: 'assistant',
-      content: assistantMessage,
-    });
+    try {
+        const response = await openai.chat.completions.create({
+            model: "gpt-5-mini",
+            messages: conversation as any,
+            max_completion_tokens: 900,
+        });
 
-    conversationHistory.set(threadId, conversation);
+        const assistantMessage = response.choices[0]?.message?.content ?? "";
 
-    return assistantMessage;
-  } catch (error) {
-    console.error('Error getting chat completion:', error);
-    return 'Извините, произошла ошибка при обработке вашего запроса. Попробуйте позже.';
-  }
+        if (!assistantMessage) {
+            return "Извините, не удалось получить ответ. Попробуйте еще раз.";
+        }
+
+        // Add assistant response to conversation history
+        conversation.push({
+            role: "assistant",
+            content: assistantMessage,
+        });
+
+        conversationHistory.set(threadId, conversation);
+
+        return assistantMessage;
+    } catch (error) {
+        console.error("Error getting chat completion:", error);
+        return "Извините, произошла ошибка при обработке вашего запроса. Попробуйте позже.";
+    }
 }
