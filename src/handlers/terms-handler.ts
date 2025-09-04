@@ -9,12 +9,12 @@ export async function showTermsOfService(
   await bot.sendMessage(chatId, 'Функциональность условий обслуживания — реализация заглушки');
 }
 
-export async function handleTermsAcceptance(
+export function handleTermsAcceptance(
   _bot: TelegramBot,
   _chatId: number,
   _userId: number,
 ): Promise<boolean> {
-  return true;
+  return Promise.resolve(true);
 }
 
 export async function handleTermsDecline(bot: TelegramBot, chatId: number): Promise<void> {
@@ -26,11 +26,8 @@ export async function hasAcceptedTerms(userId: number): Promise<boolean> {
   return userStats ? userStats.accepted_terms : false;
 }
 
-export async function handleTermsCallback(
-  _bot: TelegramBot,
-  _callbackQuery: any,
-): Promise<boolean> {
-  return false;
+export function handleTermsCallback(_bot: TelegramBot, _callbackQuery: any): Promise<boolean> {
+  return Promise.resolve(false);
 }
 
 export async function showTermsReminder(

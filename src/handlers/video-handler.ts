@@ -22,16 +22,24 @@ export async function generateVideo(
   options: Partial<VideoGenerationParams> = {},
 ): Promise<ApiResponse<VideoGenerationResponse>> {
   try {
-    const duration = Math.max(5, Math.min(10, options.duration || 5));
+    const duration = Math.max(5, Math.min(10, options.duration ?? 5));
     const aspectMap: Record<string, string> = {
       '480p': '1:1',
       '720p': '1:1',
       '1080p': '16:9',
     };
-    const aspect_ratio = aspectMap[options.resolution || '720p'] || '1:1';
+    const aspect_ratio = aspectMap[options.resolution ?? '720p'] ?? '1:1';
     const requestedMode = options.additionalParams?.mode as 'std' | 'pro' | undefined;
-    const version = options.additionalParams?.version as '1.0' | '1.5' | '1.6' | '2.0' | '2.1' | '2.1-master' | undefined;
-    const mode: 'std' | 'pro' = version === '2.0' || version === '2.1-master' ? 'pro' : (requestedMode || 'std');
+    const version = options.additionalParams?.version as
+      | '1.0'
+      | '1.5'
+      | '1.6'
+      | '2.0'
+      | '2.1'
+      | '2.1-master'
+      | undefined;
+    const mode: 'std' | 'pro' =
+      version === '2.0' || version === '2.1-master' ? 'pro' : (requestedMode ?? 'std');
 
     const body: any = {
       model: 'kling',
@@ -59,19 +67,19 @@ export async function generateVideo(
     };
 
     // Build config only when provided to satisfy enum validation
-    const config: any = {};
+    const config: { service_mode?: string; webhook_config?: any } = {};
     if (options.additionalParams?.service_mode) {
       config.service_mode = options.additionalParams.service_mode;
     }
-    if ((options as any).additionalParams?.webhook_config) {
-      config.webhook_config = (options as any).additionalParams.webhook_config;
+    if (options.additionalParams?.webhook_config) {
+      config.webhook_config = options.additionalParams.webhook_config;
     }
     if (Object.keys(config).length > 0) {
       body.config = config;
     }
 
     console.log(body);
-    const response = await goapi.post('/task', body);
+    const response = await goapi.post<any>('/task', body);
     console.log(response.data);
     const data = response.data;
     return {
@@ -86,7 +94,7 @@ export async function generateVideo(
     return {
       success: false,
       error: axios.isAxiosError(error)
-        ? { message: error.response?.data?.message || error.message }
+        ? { message: error.response?.data?.message ?? error.message }
         : { message: error instanceof Error ? error.message : 'Unknown error' },
     };
   }
@@ -96,8 +104,8 @@ export async function getPredictionStatus(predictionId: string): Promise<ApiResp
   try {
     const response = await goapi.get(`/task/${predictionId}`);
     const data = response.data?.data;
-    const works = data?.output?.works || [];
-    const videoUrl = works[0]?.video?.resource_without_watermark || works[0]?.video?.resource;
+    const works = data?.output?.works ?? [];
+    const videoUrl = works[0]?.video?.resource_without_watermark ?? works[0]?.video?.resource;
 
     return {
       success: true,
@@ -113,7 +121,7 @@ export async function getPredictionStatus(predictionId: string): Promise<ApiResp
     return {
       success: false,
       error: axios.isAxiosError(error)
-        ? { message: error.response?.data?.message || error.message }
+        ? { message: error.response?.data?.message ?? error.message }
         : { message: error instanceof Error ? error.message : 'Unknown error' },
     };
   }
