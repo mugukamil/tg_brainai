@@ -11,7 +11,7 @@ export async function sendPremiumInvoice(bot: TelegramBot, chatId: number): Prom
     const invoice: PaymentInvoice = {
       title: 'Премиум',
       description:
-        'Премиум подписка | 1000 текстовых запросов, 100 изображений, 50 видео на 1 месяц',
+        'Премиум подписка | 1000 текстовых запросов, 50 изображений, 10 видео на 1 месяц',
       payload: JSON.stringify({ type: 'premium', duration: 'monthly' }),
       provider_token: '', // Empty for Telegram Stars
       currency: 'XTR', // Telegram Stars
@@ -22,10 +22,10 @@ export async function sendPremiumInvoice(bot: TelegramBot, chatId: number): Prom
         },
       ],
       start_parameter: 'premium_subscription',
-      photo_url: 'https://placeholder.co/512x512?text=Premium',
-      photo_size: 512,
-      photo_width: 512,
-      photo_height: 512,
+      // photo_url: 'https://placeholder.co/512x512?text=Premium',
+      // photo_size: 512,
+      // photo_width: 512,
+      // photo_height: 512,
       need_name: false,
       need_phone_number: false,
       need_email: false,
@@ -34,6 +34,8 @@ export async function sendPremiumInvoice(bot: TelegramBot, chatId: number): Prom
       send_email_to_provider: false,
       is_flexible: false,
     };
+
+    console.log('Sending invoice to chat:', chatId, 'with params:', invoice);
 
     await bot.sendInvoice(
       chatId,
@@ -56,21 +58,52 @@ export async function sendPremiumInvoice(bot: TelegramBot, chatId: number): Prom
         is_flexible: invoice.is_flexible,
       },
     );
-    await logInteraction({ userId: chatId, chatId, direction: 'bot', type: 'other', content: 'sendInvoice', meta: { invoice } });
+
+    console.log('Invoice sent successfully to chat:', chatId);
+
+    await logInteraction({
+      userId: chatId,
+      chatId,
+      direction: 'bot',
+      type: 'other',
+      content: 'sendInvoice',
+      meta: { invoice },
+    });
   } catch (error) {
     console.error('Error sending invoice:', error);
-    throw new Error('Failed to send invoice');
+    console.error('Error details:', {
+      message: (error as any)?.message,
+      stack: (error as any)?.stack,
+      response: (error as any)?.response,
+      data: (error as any)?.response?.data,
+    });
+
+    // Send user-friendly error message
+    try {
+      await bot.sendMessage(
+        chatId,
+        '❌ Не удалось создать счет для оплаты.\n\n' +
+          '🔄 Пожалуйста, попробуйте еще раз позже или обратитесь в поддержку.\n\n' +
+          'Если проблема сохраняется, убедитесь что:\n' +
+          '• У вас последняя версия Telegram\n' +
+          '• Telegram Stars доступны в вашем регионе',
+      );
+    } catch (msgError) {
+      console.error('Failed to send error message to user:', msgError);
+    }
+
+    throw error; // Re-throw to maintain existing error handling flow
   }
 }
 
 /**
  * Handle pre-checkout query
  */
-export async function handlePreCheckout(
-  bot: TelegramBot,
-  preCheckoutQuery: any,
-): Promise<void> {
+export async function handlePreCheckout(bot: TelegramBot, preCheckoutQuery: any): Promise<void> {
   try {
+    console.log('=== PRE-CHECKOUT QUERY RECEIVED ===');
+    console.log('Full preCheckoutQuery object:', JSON.stringify(preCheckoutQuery, null, 2));
+
     const { id, from, invoice_payload } = preCheckoutQuery;
 
     if (!from) {
@@ -82,12 +115,22 @@ export async function handlePreCheckout(
     }
 
     console.log(`Pre-checkout from user ${from.id}: ${invoice_payload}`);
-    await logInteraction({ userId: from.id, chatId: preCheckoutQuery.from.id, direction: 'user', type: 'other', content: 'pre_checkout_query', meta: { invoice_payload } });
+    console.log('User data:', JSON.stringify(from, null, 2));
+    await logInteraction({
+      userId: from.id,
+      chatId: preCheckoutQuery.from.id,
+      direction: 'user',
+      type: 'other',
+      content: 'pre_checkout_query',
+      meta: { invoice_payload },
+    });
 
     // Parse payload to verify the purchase
     let payload;
     try {
+      console.log('Attempting to parse invoice_payload:', invoice_payload);
       payload = JSON.parse(invoice_payload);
+      console.log('Parsed payload:', payload);
     } catch (error) {
       console.error('Неверные данные счета:', error);
       await bot.answerPreCheckoutQuery(id, false, {
@@ -98,8 +141,10 @@ export async function handlePreCheckout(
 
     // Validate the purchase
     if (payload.type === 'premium') {
+      console.log('Premium purchase detected, checking user stats...');
       // Check if user exists
       const userStats = await getUserStats(from.id);
+      console.log('User stats:', userStats);
       if (!userStats) {
         await bot.answerPreCheckoutQuery(id, false, {
           error_message: 'Пользователь не найден. Пожалуйста, запустите бота сначала.',
@@ -108,8 +153,17 @@ export async function handlePreCheckout(
       }
 
       // Approve the payment
+      console.log('Approving pre-checkout query with id:', id);
       await bot.answerPreCheckoutQuery(id, true);
-      await logInteraction({ userId: from.id, chatId: from.id, direction: 'system', type: 'other', content: 'pre_checkout_ok', meta: { invoice_payload: payload } });
+      console.log('Pre-checkout query approved successfully');
+      await logInteraction({
+        userId: from.id,
+        chatId: from.id,
+        direction: 'system',
+        type: 'other',
+        content: 'pre_checkout_ok',
+        meta: { invoice_payload: payload },
+      });
     } else {
       await bot.answerPreCheckoutQuery(id, false, {
         error_message: 'Неизвестный тип покупки',
@@ -117,6 +171,11 @@ export async function handlePreCheckout(
     }
   } catch (error) {
     console.error('Error handling pre-checkout:', error);
+    console.error('Error details:', {
+      message: (error as any)?.message,
+      stack: (error as any)?.stack,
+      response: (error as any)?.response,
+    });
     await bot.answerPreCheckoutQuery(preCheckoutQuery.id, false, {
       error_message: 'Внутренняя ошибка сервера',
     });
@@ -126,10 +185,7 @@ export async function handlePreCheckout(
 /**
  * Handle successful payment
  */
-export async function handleSuccessfulPayment(
-  bot: TelegramBot,
-  message: any,
-): Promise<void> {
+export async function handleSuccessfulPayment(bot: TelegramBot, message: any): Promise<void> {
   try {
     const { chat, from } = message;
     const successfulPayment = message.successful_payment;
@@ -140,7 +196,14 @@ export async function handleSuccessfulPayment(
     const { invoice_payload, total_amount, currency } = successfulPayment;
 
     console.log(`Successful payment from user ${from?.id}: ${total_amount} ${currency}`);
-    await logInteraction({ userId: from?.id || 0, chatId: chat.id, direction: 'system', type: 'other', content: 'successful_payment', meta: { total_amount, currency, invoice_payload } });
+    await logInteraction({
+      userId: from?.id || 0,
+      chatId: chat.id,
+      direction: 'system',
+      type: 'other',
+      content: 'successful_payment',
+      meta: { total_amount, currency, invoice_payload },
+    });
 
     // Parse the payload
     let payload;
@@ -171,7 +234,13 @@ export async function handleSuccessfulPayment(
             '• 50 генераций видео\n\n' +
             'Спасибо за поддержку! 💙',
         );
-        await logInteraction({ userId: from.id, chatId: chat.id, direction: 'bot', type: 'text', content: 'premium_welcome' });
+        await logInteraction({
+          userId: from.id,
+          chatId: chat.id,
+          direction: 'bot',
+          type: 'text',
+          content: 'premium_welcome',
+        });
 
         // Log the successful upgrade
         console.log(`User ${from.id} upgraded to premium successfully`);
@@ -312,7 +381,12 @@ export async function handlePaymentCallback(
         await bot.answerCallbackQuery(callbackQuery.id, {
           text: 'Создаем счет для оплаты...',
         });
-        await sendPremiumInvoice(bot, chatId);
+        try {
+          await sendPremiumInvoice(bot, chatId);
+        } catch (error) {
+          console.error('Failed to send premium invoice from callback:', error);
+          // Error message already sent to user in sendPremiumInvoice
+        }
         return true;
 
       case 'show_pricing':
@@ -339,7 +413,7 @@ export async function handlePaymentCallback(
       text: 'Произошла ошибка',
       show_alert: true,
     });
-    return true; 
+    return true;
   }
 }
 

@@ -40,6 +40,7 @@ export function startBotWebhook(): TgBotAdapter {
 
   const bot = new TgBotAdapter(token);
 
+  setupBotHandlers(bot);
   setupBotEvents(bot);
 
   console.log('🤖 BrainAI Bot created for webhook mode');
@@ -290,6 +291,22 @@ export function setupBotEvents(bot: TgBotAdapter): void {
         .then(webhookInfo => {
           if (webhookInfo.url) {
             console.log(`🌐 Webhook URL: ${webhookInfo.url}`);
+            const allowedUpdates = (webhookInfo as any).allowed_updates;
+            if (allowedUpdates && Array.isArray(allowedUpdates)) {
+              console.log(`📋 Allowed update types: ${allowedUpdates.join(', ')}`);
+              const hasPaymentUpdates = allowedUpdates.includes('pre_checkout_query');
+              console.log(`💳 Payment updates enabled: ${hasPaymentUpdates ? '✅ Yes' : '❌ No'}`);
+              if (!hasPaymentUpdates) {
+                console.log('⚠️  WARNING: Pre-checkout queries are not enabled!');
+                console.log('   The webhook needs to be reset with payment update types.');
+                console.log('   Run: npm run reset-webhook');
+              }
+            } else {
+              console.log('📋 Allowed updates: default (messages and callbacks only)');
+              console.log('💳 Payment updates enabled: ❌ No');
+              console.log('⚠️  WARNING: Using default webhook updates - payments will not work!');
+              console.log('   Run: npm run reset-webhook');
+            }
           } else {
             console.log('📡 Using polling mode (no webhook)');
           }

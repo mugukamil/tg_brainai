@@ -40,7 +40,11 @@ export class WebhookHandler implements WebhookHandler {
     return this.startServer({ port, useNgrok: true });
   }
 
-  async startServer(options?: { port?: number; useNgrok?: boolean; baseUrl?: string }): Promise<void> {
+  async startServer(options?: {
+    port?: number;
+    useNgrok?: boolean;
+    baseUrl?: string;
+  }): Promise<void> {
     const port = options?.port ?? 3000;
     const useNgrok = options?.useNgrok !== false; // default true
     const baseUrl = options?.baseUrl;
@@ -67,8 +71,14 @@ export class WebhookHandler implements WebhookHandler {
         // Start ngrok tunnel
         console.log('🌐 Starting ngrok tunnel...');
         const ngrok = await import('@ngrok/ngrok');
-        this.ngrokListener = await ngrok.connect({ addr: port, authtoken: process.env.NGROK_AUTHTOKEN } as any);
-        this.ngrokUrl = typeof this.ngrokListener?.url === 'function' ? this.ngrokListener.url() : String(this.ngrokListener?.url || '');
+        this.ngrokListener = await ngrok.connect({
+          addr: port,
+          authtoken: process.env.NGROK_AUTHTOKEN,
+        } as any);
+        this.ngrokUrl =
+          typeof this.ngrokListener?.url === 'function'
+            ? this.ngrokListener.url()
+            : String(this.ngrokListener?.url || '');
         console.log(`✅ Ngrok tunnel established: ${this.ngrokUrl}`);
 
         // Set webhook URL via ngrok
@@ -104,56 +114,66 @@ export class WebhookHandler implements WebhookHandler {
   }
 
   private setupRoutes(): void {
-    const rawPrefix = process.env.WEBHOOK_PATH_PREFIX || "";
+    const rawPrefix = process.env.WEBHOOK_PATH_PREFIX || '';
     const basePrefix =
-        rawPrefix && rawPrefix !== "/" ? `/${rawPrefix.replace(/^\/+|\/+$/g, "")}` : "";
+      rawPrefix && rawPrefix !== '/' ? `/${rawPrefix.replace(/^\/+|\/+$/g, '')}` : '';
 
     const registerRoutes = (prefix: string) => {
-        // Health check endpoint
-        this.app.get(`${prefix}/health`, async () => {
-            return {
-                status: "ok",
-                timestamp: new Date().toISOString(),
-                webhook: this.webhookUrl,
-                ngrok: this.ngrokUrl,
-            };
-        });
+      // Health check endpoint
+      this.app.get(`${prefix}/health`, async () => {
+        return {
+          status: 'ok',
+          timestamp: new Date().toISOString(),
+          webhook: this.webhookUrl,
+          ngrok: this.ngrokUrl,
+        };
+      });
 
-        // Main webhook endpoint
-        this.app.post(`${prefix}/webhook`, async (request: any) => {
-            const update = request.body;
-            try {
-                await this.processUpdate(update);
-                return { ok: true };
-            } catch (error) {
-                console.error("Webhook processing error:", error);
-                throw error;
-            }
-        });
+      // Main webhook endpoint
+      this.app.post(`${prefix}/webhook`, async (request: any) => {
+        const update = request.body;
+        try {
+          await this.processUpdate(update);
+          return { ok: true };
+        } catch (error) {
+          console.error('Webhook processing error:', error);
+          throw error;
+        }
+      });
 
-        // API docs endpoint
-        this.app.get(`${prefix}/docs`, async () => {
-            return {
-                message: "BrainAI Bot Webhook API",
-                endpoints: {
-                    "GET /health": "Health check",
-                    "POST /webhook": "Telegram webhook",
-                    "GET /docs": "This documentation",
-                },
-            };
-        });
+      // API docs endpoint
+      this.app.get(`${prefix}/docs`, async () => {
+        return {
+          message: 'BrainAI Bot Webhook API',
+          endpoints: {
+            'GET /health': 'Health check',
+            'POST /webhook': 'Telegram webhook',
+            'GET /docs': 'This documentation',
+          },
+        };
+      });
     };
 
     // Register at root (no prefix)
-    registerRoutes("");
+    registerRoutes('');
 
     // Also register with base prefix if provided (for reverse proxies)
     if (basePrefix) {
-        registerRoutes(basePrefix);
+      registerRoutes(basePrefix);
     }
   }
 
   private async processUpdate(update: any): Promise<void> {
+    console.log('=== WEBHOOK UPDATE RECEIVED ===');
+    console.log('Update ID:', update.update_id);
+    console.log(
+      'Update type:',
+      Object.keys(update)
+        .filter(k => k !== 'update_id')
+        .join(', '),
+    );
+    console.log('Full update:', JSON.stringify(update, null, 2));
+
     try {
       if (update.message) {
         const msg = update.message;
@@ -174,10 +194,19 @@ export class WebhookHandler implements WebhookHandler {
       }
 
       if (update.pre_checkout_query) {
+        console.log('=== PRE-CHECKOUT QUERY DETECTED IN WEBHOOK ===');
+        console.log('Pre-checkout query data:', JSON.stringify(update.pre_checkout_query, null, 2));
+        console.log('Calling handlePreCheckoutQuery...');
         await handlePreCheckoutQuery(this.bot as any, update.pre_checkout_query);
+        console.log('handlePreCheckoutQuery completed');
       }
     } catch (error) {
       console.error('Error processing update:', error);
+      console.error('Error details:', {
+        message: (error as any)?.message,
+        stack: (error as any)?.stack,
+        update: JSON.stringify(update, null, 2),
+      });
       throw error;
     }
   }
@@ -191,6 +220,18 @@ export class WebhookHandler implements WebhookHandler {
       const result = await this.bot.setWebHook(this.webhookUrl);
       if (result) {
         console.log('✅ Webhook configured successfully');
+
+        // Get and display webhook info
+        const webhookInfo = await this.bot.getWebHookInfo();
+        console.log('🌐 Webhook URL:', webhookInfo.url);
+        console.log('📋 Allowed updates:', webhookInfo.allowed_updates?.join(', ') || 'default');
+
+        // Check if pre_checkout_query is included
+        if (webhookInfo.allowed_updates?.includes('pre_checkout_query')) {
+          console.log('✅ Payment updates (pre_checkout_query) are enabled');
+        } else {
+          console.log('⚠️ Payment updates (pre_checkout_query) are NOT enabled!');
+        }
       } else {
         throw new Error('Failed to set webhook');
       }
