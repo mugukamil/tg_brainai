@@ -215,7 +215,7 @@ class SetupVerifier {
 
     // Check scripts
     const requiredScripts = ['build', 'dev', 'start', 'type-check'];
-    const scripts = pkg.scripts || {};
+    const scripts = pkg.scripts ?? {};
     const missingScripts = requiredScripts.filter(script => !scripts[script]);
 
     if (missingScripts.length === 0) {
@@ -255,7 +255,7 @@ class SetupVerifier {
       'esModuleInterop',
     ];
 
-    const compilerOptions = tsconfig.compilerOptions || {};
+    const compilerOptions = tsconfig.compilerOptions ?? {};
     const missing = requiredOptions.filter(option => !compilerOptions[option]);
 
     if (missing.length === 0) {

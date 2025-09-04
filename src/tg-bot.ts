@@ -69,7 +69,7 @@ export function setupBotHandlers(bot: TgBotAdapter): void {
         await handleVoiceMessage(bot, msg);
       } else if (msg.photo) {
         await handlePhotoMessage(bot, msg);
-      } else if (msg.video_note || msg.video) {
+      } else if (msg.video_note ?? msg.video) {
         // Handle video messages
         await bot.sendMessage(
           msg.chat.id,
@@ -244,7 +244,7 @@ export function setupBotHandlers(bot: TgBotAdapter): void {
 export function setupBotEvents(bot: TgBotAdapter): void {
   // Handle polling errors
   bot.on('polling_error', (error: any) => {
-    console.error('Polling error:', (error as any).code, (error as any).message);
+    console.error('Polling error:', error.code, error.message);
 
     // Handle specific error types
     if (error.code === 'EFATAL') {

@@ -175,7 +175,7 @@ export class TgBotAdapter {
   async getFileLink(fileId: string): Promise<string> {
     const file: any = await this.client.getFile(fileId);
     const token = this.token;
-    const filePath: string = file?.file_path || file?.filePath || file?.file?.file_path || '';
+    const filePath: string = file?.file_path ?? file?.filePath ?? file?.file?.file_path ?? '';
     return `https://api.telegram.org/file/bot${token}/${filePath}`;
   }
 
@@ -233,8 +233,8 @@ export class TgBotAdapter {
     await this.client.answerInlineQuery({
       inlineQueryId: id,
       results,
-      ...(options || {}),
-    } as any);
+      ...(options ?? {}),
+    });
   }
 
   async sendInvoice(
@@ -298,7 +298,7 @@ export class TgBotAdapter {
     const webhookInfo = result.result;
     console.log(
       '📊 Webhook allowed updates:',
-      webhookInfo.allowed_updates || 'default (messages only)',
+      webhookInfo.allowed_updates ?? 'default (messages only)',
     );
 
     return {
@@ -343,7 +343,7 @@ export class TgBotAdapter {
     const result = (await response.json()) as any;
     if (!result.ok) {
       console.error('Failed to set webhook:', result);
-      throw new Error(`Failed to set webhook: ${result.description || 'Unknown error'}`);
+      throw new Error(`Failed to set webhook: ${result.description ?? 'Unknown error'}`);
     }
 
     console.log('✅ Webhook set with all update types including pre_checkout_query');
@@ -372,10 +372,10 @@ export class TgBotAdapter {
       msg.from ??
       (msg.author
         ? {
-            id: msg.author.id,
-            username: msg.author.username,
-            first_name: msg.author.firstName,
-          }
+          id: msg.author.id,
+          username: msg.author.username,
+          first_name: msg.author.firstName,
+        }
         : undefined);
     return msg as TgMessage;
   }

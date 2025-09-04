@@ -29,7 +29,7 @@ export async function logInteraction(entry: InteractionLogEntry): Promise<void> 
     const enriched = { ...entry, timestamp: new Date().toISOString() };
     const filePath = getLogFilePath();
     await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.appendFile(filePath, JSON.stringify(enriched) + '\n', 'utf8');
+    await fs.appendFile(filePath, `${JSON.stringify(enriched)}\n`, 'utf8');
   } catch (error) {
     // Avoid throwing from logger
     // eslint-disable-next-line no-console
@@ -45,8 +45,8 @@ export async function logInteraction(entry: InteractionLogEntry): Promise<void> 
         direction: entry.direction,
         type: entry.type,
         content: entry.content,
-        meta: entry.meta || null,
-        timestamp: entry.timestamp || new Date().toISOString(),
+        meta: entry.meta ?? null,
+        timestamp: entry.timestamp ?? new Date().toISOString(),
       });
     }
   } catch (error) {
@@ -54,5 +54,3 @@ export async function logInteraction(entry: InteractionLogEntry): Promise<void> 
     console.error('Central logger error:', error);
   }
 }
-
-

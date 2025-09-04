@@ -41,10 +41,10 @@ export async function generateImage(
       model: 'midjourney',
       task_type: 'imagine',
       input: {
-        prompt: prompt,
-        aspect_ratio: options.aspect_ratio || '1:1',
+        prompt,
+        aspect_ratio: options.aspect_ratio ?? '1:1',
         ...(options.process_mode && { process_mode: options.process_mode }),
-        skip_prompt_check: options.skip_prompt_check || false,
+        skip_prompt_check: options.skip_prompt_check ?? false,
         ...(options.bot_id && { bot_id: options.bot_id }),
       },
       config: {
@@ -52,7 +52,7 @@ export async function generateImage(
       },
     };
 
-    const response = await goapi.post('/task', requestBody);
+    const response = await goapi.post<GoApiImageResponse>('/task', requestBody);
     return {
       success: true,
       data: response.data,
@@ -65,7 +65,7 @@ export async function generateImage(
     return {
       success: false,
       error: axios.isAxiosError(error)
-        ? error.response?.data || { message: error.message }
+        ? ((error.response?.data as { message: string }) ?? { message: error.message })
         : { message: error instanceof Error ? error.message : 'Unknown error' },
     };
   }
@@ -82,7 +82,7 @@ export async function upscaleImage(
   index: number,
 ): Promise<ApiResponse<GoApiImageResponse>> {
   try {
-    const response = await goapi.post('/task', {
+    const response = await goapi.post<GoApiImageResponse>('/task', {
       model: 'midjourney',
       task_type: 'upscale',
       input: {
@@ -102,7 +102,7 @@ export async function upscaleImage(
     return {
       success: false,
       error: axios.isAxiosError(error)
-        ? error.response?.data || { message: error.message }
+        ? ((error.response?.data as { message: string }) ?? { message: error.message })
         : { message: error instanceof Error ? error.message : 'Unknown error' },
     };
   }
@@ -119,7 +119,7 @@ export async function variateImage(
   index: number,
 ): Promise<ApiResponse<GoApiImageResponse>> {
   try {
-    const response = await goapi.post('/task', {
+    const response = await goapi.post<GoApiImageResponse>('/task', {
       model: 'midjourney',
       task_type: 'variation',
       input: {
@@ -139,7 +139,7 @@ export async function variateImage(
     return {
       success: false,
       error: axios.isAxiosError(error)
-        ? error.response?.data || { message: error.message }
+        ? ((error.response?.data as { message: string }) ?? { message: error.message })
         : { message: error instanceof Error ? error.message : 'Unknown error' },
     };
   }
@@ -152,7 +152,7 @@ export async function variateImage(
  */
 export async function getTaskStatus(taskId: string): Promise<ApiResponse<GoApiImageResponse>> {
   try {
-    const response = await goapi.get(`/task/${taskId}`);
+    const response = await goapi.get<GoApiImageResponse>(`/task/${taskId}`);
     return {
       success: true,
       data: response.data,
@@ -165,7 +165,7 @@ export async function getTaskStatus(taskId: string): Promise<ApiResponse<GoApiIm
     return {
       success: false,
       error: axios.isAxiosError(error)
-        ? error.response?.data || { message: error.message }
+        ? ((error.response?.data as { message: string }) ?? { message: error.message })
         : { message: error instanceof Error ? error.message : 'Unknown error' },
     };
   }
@@ -180,8 +180,8 @@ export async function getTaskStatus(taskId: string): Promise<ApiResponse<GoApiIm
  */
 export async function waitForTaskCompletion(
   taskId: string,
-  maxWaitTime: number = 300000,
-  pollInterval: number = 5000,
+  maxWaitTime = 300000,
+  pollInterval = 5000,
 ): Promise<ApiResponse<GoApiImageResponse>> {
   const startTime = Date.now();
 
@@ -199,7 +199,7 @@ export async function waitForTaskCompletion(
     } else if (status === 'failed') {
       return {
         success: false,
-        error: statusResult.data?.data?.error || { message: 'Задача не выполнена' },
+        error: statusResult.data?.data?.error ?? { message: 'Задача не выполнена' },
       };
     }
 

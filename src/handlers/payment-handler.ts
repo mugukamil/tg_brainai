@@ -1,7 +1,13 @@
-import type { TelegramLikeBot as TelegramBot } from '../tg-client.js';
+import type {
+  TelegramLikeBot as TelegramBot,
+  TgPreCheckoutQuery,
+  TgMessage,
+  TgCallbackQuery,
+} from '../tg-client.js';
 import { setPremium, getUserStats } from './supabase-handler.js';
 import type { PaymentInvoice } from '../types/index.js';
 import { logInteraction } from '../utils/logger.js';
+import axios from 'axios';
 
 /**
  * Create invoice for premium subscription
@@ -72,10 +78,10 @@ export async function sendPremiumInvoice(bot: TelegramBot, chatId: number): Prom
   } catch (error) {
     console.error('Error sending invoice:', error);
     console.error('Error details:', {
-      message: (error as any)?.message,
-      stack: (error as any)?.stack,
-      response: (error as any)?.response,
-      data: (error as any)?.response?.data,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      response: axios.isAxiosError(error) ? error.response : undefined,
+      data: axios.isAxiosError(error) ? error.response?.data : undefined,
     });
 
     // Send user-friendly error message
@@ -99,7 +105,10 @@ export async function sendPremiumInvoice(bot: TelegramBot, chatId: number): Prom
 /**
  * Handle pre-checkout query
  */
-export async function handlePreCheckout(bot: TelegramBot, preCheckoutQuery: any): Promise<void> {
+export async function handlePreCheckout(
+  bot: TelegramBot,
+  preCheckoutQuery: TgPreCheckoutQuery,
+): Promise<void> {
   try {
     console.log('=== PRE-CHECKOUT QUERY RECEIVED ===');
     console.log('Full preCheckoutQuery object:', JSON.stringify(preCheckoutQuery, null, 2));
@@ -185,7 +194,7 @@ export async function handlePreCheckout(bot: TelegramBot, preCheckoutQuery: any)
 /**
  * Handle successful payment
  */
-export async function handleSuccessfulPayment(bot: TelegramBot, message: any): Promise<void> {
+export async function handleSuccessfulPayment(bot: TelegramBot, message: TgMessage): Promise<void> {
   try {
     const { chat, from } = message;
     const successfulPayment = message.successful_payment;
@@ -197,7 +206,7 @@ export async function handleSuccessfulPayment(bot: TelegramBot, message: any): P
 
     console.log(`Successful payment from user ${from?.id}: ${total_amount} ${currency}`);
     await logInteraction({
-      userId: from?.id || 0,
+      userId: from?.id ?? 0,
       chatId: chat.id,
       direction: 'system',
       type: 'other',
@@ -357,7 +366,7 @@ export async function showHowToBuyStars(bot: TelegramBot, chatId: number): Promi
  */
 export async function handlePaymentCallback(
   bot: TelegramBot,
-  callbackQuery: any,
+  callbackQuery: TgCallbackQuery,
 ): Promise<boolean> {
   try {
     const { data, message, from } = callbackQuery;
@@ -448,25 +457,25 @@ export async function checkPaymentStatus(
 
     const keyboard = userStats.is_premium
       ? {
-          inline_keyboard: [
-            [
-              {
-                text: '📊 Обновить статистику',
-                callback_data: JSON.stringify({ action: 'refresh_stats' }),
-              },
-            ],
+        inline_keyboard: [
+          [
+            {
+              text: '📊 Обновить статистику',
+              callback_data: JSON.stringify({ action: 'refresh_stats' }),
+            },
           ],
-        }
+        ],
+      }
       : {
-          inline_keyboard: [
-            [
-              {
-                text: '⭐ Купить Премиум',
-                callback_data: JSON.stringify({ action: 'buy_premium' }),
-              },
-            ],
+        inline_keyboard: [
+          [
+            {
+              text: '⭐ Купить Премиум',
+              callback_data: JSON.stringify({ action: 'buy_premium' }),
+            },
           ],
-        };
+        ],
+      };
 
     await bot.sendMessage(chatId, statusMessage, {
       parse_mode: 'Markdown',

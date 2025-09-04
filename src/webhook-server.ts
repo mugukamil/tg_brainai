@@ -25,7 +25,7 @@ function validateEnvironment(): ServerConfig {
   return {
     botToken: process.env.TELEGRAM_BOT_TOKEN!,
     publicUrl: process.env.WEBHOOK_PUBLIC_URL!,
-    port: parseInt(process.env.PORT || '3000', 10),
+    port: parseInt(process.env.PORT ?? '3000', 10),
   };
 }
 
@@ -37,7 +37,7 @@ async function startServer(): Promise<void> {
     const cfg = validateEnvironment();
 
     // Force server mode defaults
-    process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+    process.env.NODE_ENV = process.env.NODE_ENV ?? 'production';
     process.env.USE_NGROK = 'false';
 
     // Create bot instance for webhook mode
@@ -93,7 +93,10 @@ async function startServer(): Promise<void> {
       process.exit(1);
     });
   } catch (error) {
-    console.error('❌ Failed to start webhook server:', error instanceof Error ? error.message : error);
+    console.error(
+      '❌ Failed to start webhook server:',
+      error instanceof Error ? error.message : error,
+    );
     console.error('\n🔧 Troubleshooting:');
     console.error('  • Ensure WEBHOOK_PUBLIC_URL is set to your public domain (https)');
     console.error('  • Verify your Telegram bot token is valid');
@@ -117,5 +120,3 @@ startServer().catch(error => {
   console.error('❌ Fatal error:', error instanceof Error ? error.message : error);
   process.exit(1);
 });
-
-

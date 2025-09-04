@@ -25,8 +25,8 @@ function validateEnvironment(): DevConfig {
 
   return {
     botToken: process.env.TELEGRAM_BOT_TOKEN!,
-    nodeEnv: process.env.NODE_ENV || 'development',
-    port: parseInt(process.env.PORT || '3000', 10),
+    nodeEnv: process.env.NODE_ENV ?? 'development',
+    port: parseInt(process.env.PORT ?? '3000', 10),
   };
 }
 
@@ -52,10 +52,10 @@ async function startDevelopment(): Promise<void> {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📱 Your bot is now running in webhook mode');
     const status = await webhookHandler.getStatus();
-    console.log(`🔗 Ngrok URL: ${status.local?.ngrokUrl || 'N/A'}`);
-    console.log(`📡 Webhook URL: ${status.local?.webhookUrl || 'N/A'}`);
-    console.log(`🔍 Health check: ${status.local?.ngrokUrl || 'N/A'}/health`);
-    console.log(`📚 API docs: ${status.local?.ngrokUrl || 'N/A'}/docs`);
+    console.log(`🔗 Ngrok URL: ${status.local?.ngrokUrl ?? 'N/A'}`);
+    console.log(`📡 Webhook URL: ${status.local?.webhookUrl ?? 'N/A'}`);
+    console.log(`🔍 Health check: ${status.local?.ngrokUrl ?? 'N/A'}/health`);
+    console.log(`📚 API docs: ${status.local?.ngrokUrl ?? 'N/A'}/docs`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('\n💡 Tips for development:');
     console.log('  • Test your bot by sending messages in Telegram');

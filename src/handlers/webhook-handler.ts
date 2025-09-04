@@ -78,14 +78,14 @@ export class WebhookHandler implements WebhookHandler {
         this.ngrokUrl =
           typeof this.ngrokListener?.url === 'function'
             ? this.ngrokListener.url()
-            : String(this.ngrokListener?.url || '');
+            : String(this.ngrokListener?.url ?? '');
         console.log(`✅ Ngrok tunnel established: ${this.ngrokUrl}`);
 
         // Set webhook URL via ngrok
         this.webhookUrl = `${this.ngrokUrl}/webhook`;
       } else {
         // No ngrok: require baseUrl
-        const resolvedBaseUrl = baseUrl || process.env.WEBHOOK_PUBLIC_URL || '';
+        const resolvedBaseUrl = baseUrl ?? process.env.WEBHOOK_PUBLIC_URL ?? '';
         if (!resolvedBaseUrl) {
           throw new Error('WEBHOOK_PUBLIC_URL is required when USE_NGROK=false');
         }
@@ -102,8 +102,8 @@ export class WebhookHandler implements WebhookHandler {
       if (this.ngrokUrl) {
         console.log(`🔍 Health check: ${this.ngrokUrl}/health`);
         console.log(`📚 API docs: ${this.ngrokUrl}/docs`);
-      } else if (baseUrl || process.env.WEBHOOK_PUBLIC_URL) {
-        const url = (baseUrl || process.env.WEBHOOK_PUBLIC_URL) as string;
+      } else if (baseUrl ?? process.env.WEBHOOK_PUBLIC_URL) {
+        const url = (baseUrl ?? process.env.WEBHOOK_PUBLIC_URL) as string;
         console.log(`🔍 Health check: ${url.replace(/\/$/, '')}/health`);
         console.log(`📚 API docs: ${url.replace(/\/$/, '')}/docs`);
       }
@@ -114,7 +114,7 @@ export class WebhookHandler implements WebhookHandler {
   }
 
   private setupRoutes(): void {
-    const rawPrefix = process.env.WEBHOOK_PATH_PREFIX || '';
+    const rawPrefix = process.env.WEBHOOK_PATH_PREFIX ?? '';
     const basePrefix =
       rawPrefix && rawPrefix !== '/' ? `/${rawPrefix.replace(/^\/+|\/+$/g, '')}` : '';
 
@@ -224,7 +224,7 @@ export class WebhookHandler implements WebhookHandler {
         // Get and display webhook info
         const webhookInfo = await this.bot.getWebHookInfo();
         console.log('🌐 Webhook URL:', webhookInfo.url);
-        console.log('📋 Allowed updates:', webhookInfo.allowed_updates?.join(', ') || 'default');
+        console.log('📋 Allowed updates:', webhookInfo.allowed_updates?.join(', ') ?? 'default');
 
         // Check if pre_checkout_query is included
         if (webhookInfo.allowed_updates?.includes('pre_checkout_query')) {
@@ -297,7 +297,7 @@ export async function startWebhook(bot: TelegramLikeBot): Promise<WebhookHandler
   const webhookHandler = new WebhookHandler(bot);
 
   // Start the webhook server
-  const port = parseInt(process.env.PORT || '3000');
+  const port = parseInt(process.env.PORT ?? '3000');
   const useNgrok = process.env.USE_NGROK !== 'false';
   const baseUrl = process.env.WEBHOOK_PUBLIC_URL;
   if (baseUrl) {

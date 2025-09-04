@@ -13,7 +13,7 @@ function getStartupConfig(): StartupConfig {
   return {
     useWebhook: process.env.USE_WEBHOOK === 'true',
     isDevelopment: process.env.NODE_ENV === 'development',
-    port: parseInt(process.env.PORT || '3000', 10),
+    port: parseInt(process.env.PORT ?? '3000', 10),
     webhookUrl: process.env.WEBHOOK_URL,
   };
 }
@@ -81,7 +81,7 @@ async function main(): Promise<void> {
         );
       } else if (error.message.includes('ENOTFOUND')) {
         console.error('💡 Network connectivity issue. Check your internet connection.');
-      } else if (error.message.includes('unauthorized') || error.message.includes('401')) {
+      } else if (error.message.includes('unauthorized') ?? error.message.includes('401')) {
         console.error('💡 Authentication failed. Check your API keys in the .env file.');
       } else if (error.message.includes('webhook')) {
         console.error(

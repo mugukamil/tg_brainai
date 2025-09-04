@@ -1,11 +1,11 @@
-import type { gpt_tg_users } from "@prisma/client";
+import type { gpt_tg_users } from '@prisma/client';
 
 export type DbUser = gpt_tg_users;
 
 export interface CreateUserData {
     telegram_id: number;
     openai_thread_id: string;
-    current_mode?: "text" | "photo" | "video";
+    current_mode?: 'text' | 'photo' | 'video';
     text_req_left?: number;
     image_req_left?: number;
     video_req_left?: number;
@@ -16,7 +16,7 @@ export interface CreateUserData {
 }
 
 export interface UpdateUserData {
-    current_mode?: "text" | "photo" | "video";
+    current_mode?: 'text' | 'photo' | 'video';
     text_req_left?: number;
     image_req_left?: number;
     video_req_left?: number;
@@ -29,7 +29,7 @@ export interface UpdateUserData {
 
 export interface UserStats {
     telegram_id: number;
-    current_mode: "text" | "photo" | "video";
+    current_mode: 'text' | 'photo' | 'video';
     text_req_left: number;
     image_req_left: number;
     video_req_left: number;
@@ -55,9 +55,9 @@ export interface ApiError {
 export interface GoApiImageRequest {
     prompt: string;
     aspect_ratio?: string;
-    process_mode?: "fast" | "turbo" | "relax";
+    process_mode?: 'fast' | 'turbo' | 'relax';
     skip_prompt_check?: boolean;
-    service_mode?: "public" | "private";
+    service_mode?: 'public' | 'private';
     bot_id?: number;
 }
 
@@ -67,7 +67,7 @@ export interface GoApiImageResponse {
         task_id: string;
         model: string;
         task_type: string;
-        status: "pending" | "processing" | "completed" | "failed" | "staged";
+        status: 'pending' | 'processing' | 'completed' | 'failed' | 'staged';
         config: {
             service_mode: string;
             webhook_config: {
@@ -113,7 +113,7 @@ export interface ImageGenerationParams {
 
 export interface VideoGenerationParams {
     prompt: string;
-    resolution: "480p" | "720p" | "1080p";
+    resolution: '480p' | '720p' | '1080p';
     duration: number;
     fps: number;
     guidance_scale?: number;
@@ -124,7 +124,7 @@ export interface VideoGenerationParams {
 
 export interface VideoGenerationResponse {
     prediction_id: string;
-    status: "starting" | "processing" | "succeeded" | "failed" | "canceled";
+    status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
     output?: string | string[];
     urls?: {
         get: string;
@@ -134,7 +134,7 @@ export interface VideoGenerationResponse {
 
 export interface ReplicateStatus {
     id: string;
-    status: "starting" | "processing" | "succeeded" | "failed" | "canceled";
+    status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
     output?: any;
     error?: string;
     logs?: string[];
@@ -259,7 +259,7 @@ export interface OpenAIMessage {
     object: string;
     created_at: number;
     thread_id: string;
-    role: "user" | "assistant";
+    role: 'user' | 'assistant';
     content: Array<{
         type: string;
         text: {
@@ -280,14 +280,14 @@ export interface OpenAIRun {
     assistant_id: string;
     thread_id: string;
     status:
-        | "queued"
-        | "in_progress"
-        | "requires_action"
-        | "cancelling"
-        | "cancelled"
-        | "failed"
-        | "completed"
-        | "expired";
+        | 'queued'
+        | 'in_progress'
+        | 'requires_action'
+        | 'cancelling'
+        | 'cancelled'
+        | 'failed'
+        | 'completed'
+        | 'expired';
     started_at?: number;
     expires_at?: number;
     cancelled_at?: number;
@@ -323,32 +323,32 @@ export interface ConfigOptions {
     };
 }
 
-export type RequestType = "text_req_left" | "image_req_left" | "video_req_left";
+export type RequestType = 'text_req_left' | 'image_req_left' | 'video_req_left';
 
-export type ProcessingMode = "fast" | "turbo" | "relax";
+export type ProcessingMode = 'fast' | 'turbo' | 'relax';
 
 export type AspectRatio =
-    | "1:1"
-    | "1:2"
-    | "2:1"
-    | "2:3"
-    | "3:2"
-    | "3:4"
-    | "4:3"
-    | "4:5"
-    | "5:4"
-    | "9:16"
-    | "16:9"
-    | "21:9"
-    | "9:21";
+    | '1:1'
+    | '1:2'
+    | '2:1'
+    | '2:3'
+    | '3:2'
+    | '3:4'
+    | '4:3'
+    | '4:5'
+    | '5:4'
+    | '9:16'
+    | '16:9'
+    | '21:9'
+    | '9:21';
 
-export type VideoResolution = "480p" | "720p" | "1080p";
+export type VideoResolution = '480p' | '720p' | '1080p';
 
-export type BotMode = "text" | "photo" | "video";
+export type BotMode = 'text' | 'photo' | 'video';
 
-export type TaskStatus = "pending" | "processing" | "completed" | "failed" | "staged";
+export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'staged';
 
-export type PaymentMode = "public" | "private";
+export type PaymentMode = 'public' | 'private';
 
 export interface ModelResponse {
     choices: Array<{
