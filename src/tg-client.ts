@@ -292,7 +292,7 @@ export class TgBotAdapter {
     const result = (await response.json()) as any;
     if (!result.ok) {
       console.error('Failed to get webhook info:', result);
-      return { url: undefined };
+      return { url: '' };
     }
 
     const webhookInfo = result.result;
