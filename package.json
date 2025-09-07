@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:goapi": "tsx src/test-goapi.ts",
     "test:performance": "tsx src/test-performance.ts",
+    "test:video": "tsx test-video.ts",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist",
     "build:prod": "npm run clean && npm run build",

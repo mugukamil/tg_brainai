@@ -10,6 +10,32 @@ import { decreaseRequests, canConsumeRequest } from '../supabase-handler.js';
 import { safeEditMessageText } from '../handler-utils.js';
 import { logInteraction } from '../../utils/logger.js';
 
+// Helper function to detect media type from URL
+function getMediaType(url: string): 'video' | 'animation' | 'document' {
+  const urlLower = url.toLowerCase();
+
+  // Check file extension
+  const extension = url.split('.').pop()?.split('?')[0]?.toLowerCase();
+
+  // GIF detection
+  if (extension === 'gif' || urlLower.includes('.gif') || urlLower.includes('format=gif')) {
+    return 'animation';
+  }
+
+  // Video formats
+  if (['mp4', 'mov', 'avi', 'webm', 'mkv'].includes(extension || '')) {
+    return 'video';
+  }
+
+  // Check URL patterns
+  if (urlLower.includes('/gif/') || urlLower.includes('type=gif')) {
+    return 'animation';
+  }
+
+  // Default to video for Kling outputs
+  return 'video';
+}
+
 export async function handleVideoGeneration(bot: TelegramBot, msg: any): Promise<void> {
   const chatId = msg.chat.id;
   const text = msg.text;
@@ -90,9 +116,45 @@ export async function handleVideoGeneration(bot: TelegramBot, msg: any): Promise
           clearInterval(timer);
           const url = Array.isArray(st.data?.output) ? st.data?.output[0] : undefined;
           if (url) {
-            await bot.sendVideo(chatId, url, {
-              caption: `Видео по запросу: ${params.prompt}`,
-            });
+            const mediaType = getMediaType(url);
+            const caption = `🎬 ${mediaType === 'animation' ? 'Анимация' : 'Видео'} по запросу: ${params.prompt}`;
+
+            console.log(`Sending media as ${mediaType}:`, url);
+
+            try {
+              switch (mediaType) {
+                case 'animation':
+                  await bot.sendAnimation(chatId, url, { caption });
+                  break;
+                case 'video':
+                  await bot.sendVideo(chatId, url, {
+                    caption,
+                    duration: params.duration,
+                    supports_streaming: true,
+                    width: 1280,
+                    height: 720,
+                  });
+                  break;
+                case 'document':
+                  await bot.sendDocument(chatId, url, { caption });
+                  break;
+              }
+            } catch (sendError) {
+              console.error(`Failed to send as ${mediaType}, trying as document:`, sendError);
+              // Fallback to document if specific method fails
+              try {
+                await bot.sendDocument(chatId, url, {
+                  caption: `📎 Медиа файл: ${params.prompt}`,
+                });
+              } catch (docError) {
+                console.error('Failed to send as document:', docError);
+                // Last resort: send URL as text
+                await bot.sendMessage(
+                  chatId,
+                  `✅ Генерация завершена!\n\nСсылка на результат: ${url}\n\nЗапрос: ${params.prompt}`,
+                );
+              }
+            }
             await logInteraction({
               userId: userId!,
               chatId,
