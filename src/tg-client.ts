@@ -164,6 +164,41 @@ export class TgBotAdapter {
       video: data as any,
       caption: options?.caption,
       replyMarkup: options?.reply_markup,
+      duration: options?.duration,
+      width: options?.width,
+      height: options?.height,
+      supportsStreaming: options?.supports_streaming ?? true,
+      disableNotification: options?.disable_notification,
+    } as any);
+    return this.mapMessage(msg);
+  }
+
+  async sendAnimation(
+    chatId: number,
+    data: Buffer | string,
+    options?: any,
+    _fileOptions?: { filename?: string; contentType?: string },
+  ): Promise<TgMessage> {
+    const msg = await this.client.sendAnimation({
+      chatId,
+      animation: data as any,
+      caption: options?.caption,
+      replyMarkup: options?.reply_markup,
+    } as any);
+    return this.mapMessage(msg);
+  }
+
+  async sendDocument(
+    chatId: number,
+    data: Buffer | string,
+    options?: any,
+    _fileOptions?: { filename?: string; contentType?: string },
+  ): Promise<TgMessage> {
+    const msg = await this.client.sendDocument({
+      chatId,
+      document: data as any,
+      caption: options?.caption,
+      replyMarkup: options?.reply_markup,
     } as any);
     return this.mapMessage(msg);
   }
@@ -372,10 +407,10 @@ export class TgBotAdapter {
       msg.from ??
       (msg.author
         ? {
-          id: msg.author.id,
-          username: msg.author.username,
-          first_name: msg.author.firstName,
-        }
+            id: msg.author.id,
+            username: msg.author.username,
+            first_name: msg.author.firstName,
+          }
         : undefined);
     return msg as TgMessage;
   }
