@@ -5,7 +5,9 @@ import type {
   ApiResponse,
   AspectRatio,
   TelegramInlineKeyboard,
-} from '../types/index';
+  ProcessingMode,
+  PaymentMode,
+} from '@/types/index';
 
 const GOAPI_API_KEY = process.env.GOAPI_API_KEY;
 
@@ -16,7 +18,7 @@ if (!GOAPI_API_KEY) {
 const goapi = axios.create({
   baseURL: 'https://api.goapi.ai/api/v1',
   headers: {
-    'x-api-key': GOAPI_API_KEY,
+    'X-API-Key': GOAPI_API_KEY,
     'Content-Type': 'application/json',
   },
 });
@@ -39,9 +41,10 @@ export async function generateImage(
   try {
     const requestBody = {
       model: 'midjourney',
-      task_type: 'imagine',
+      task_type: options.task_type ?? 'imagine',
       input: {
         prompt,
+        image_url: options.image_url,
         aspect_ratio: options.aspect_ratio ?? '1:1',
         ...(options.process_mode && { process_mode: options.process_mode }),
         skip_prompt_check: options.skip_prompt_check ?? false,
@@ -197,9 +200,14 @@ export async function waitForTaskCompletion(
     if (status === 'completed') {
       return statusResult;
     } else if (status === 'failed') {
+      const taskError = statusResult.data?.data?.error;
+      console.error('Task failed with error:', JSON.stringify(taskError, null, 2));
+      console.error('Full task data on failure:', JSON.stringify(statusResult.data?.data, null, 2));
+
+      const errorMessage = taskError?.message || taskError?.raw_message || 'Задача не выполнена';
       return {
         success: false,
-        error: statusResult.data?.data?.error ?? { message: 'Задача не выполнена' },
+        error: { message: errorMessage },
       };
     }
 
@@ -234,6 +242,101 @@ export async function generateImageAndWait(
     return {
       success: false,
       error: { message: 'Идентификатор задачи не получен из запроса на генерацию' },
+    };
+  }
+
+  return await waitForTaskCompletion(taskId);
+}
+
+/**
+ * Describe an image to get prompt suggestions using Midjourney API
+ * @param {string} imageUrl - URL of the image to describe
+ * @param {Object} options - Additional options for the describe operation
+ * @param {string} options.process_mode - Processing mode: "relax", "fast", "turbo"
+ * @param {number} options.bot_id - Specific bot ID to use (Premium plan only)
+ * @param {string} options.service_mode - "public" (PAYG) or "private" (HYA)
+ * @returns {Promise<Object>} Task creation response
+ */
+export async function describeImage(
+  imageUrl: string,
+  options: Partial<{
+    process_mode: ProcessingMode;
+    bot_id: number;
+    service_mode: PaymentMode;
+  }> = {},
+): Promise<ApiResponse<GoApiImageResponse>> {
+  try {
+    const requestBody = {
+      model: 'midjourney',
+      task_type: 'describe',
+      input: {
+        image_url: imageUrl,
+        ...(options.process_mode && { process_mode: options.process_mode }),
+        ...(options.bot_id !== undefined && { bot_id: options.bot_id }),
+      },
+      config: {
+        ...(options.service_mode && { service_mode: options.service_mode }),
+        webhook_config: {
+          endpoint: '',
+          secret: '',
+        },
+      },
+    };
+
+    console.log('describeImage: Making request with body:', JSON.stringify(requestBody, null, 2));
+    const response = await goapi.post<GoApiImageResponse>('/task', requestBody);
+    console.log('describeImage: Response status:', response.status);
+    console.log('describeImage: Response data:', JSON.stringify(response.data, null, 2));
+    return {
+      success: true,
+      data: response.data,
+    };
+  } catch (error) {
+    console.error(
+      'Error describing image:',
+      axios.isAxiosError(error) ? error.response?.data : error,
+    );
+    if (axios.isAxiosError(error)) {
+      console.error('describeImage: Error status:', error.response?.status);
+      console.error(
+        'describeImage: Error response:',
+        JSON.stringify(error.response?.data, null, 2),
+      );
+    }
+    return {
+      success: false,
+      error: axios.isAxiosError(error)
+        ? ((error.response?.data as { message: string }) ?? { message: error.message })
+        : { message: error instanceof Error ? error.message : 'Unknown error' },
+    };
+  }
+}
+
+/**
+ * Describe an image and wait for completion to get prompt suggestions
+ * @param {string} imageUrl - URL of the image to describe
+ * @param {Object} options - Additional options for the describe operation
+ * @returns {Promise<Object>} Completed task with prompt suggestions
+ */
+export async function describeImageAndWait(
+  imageUrl: string,
+  options: Partial<{
+    process_mode: ProcessingMode;
+    bot_id: number;
+    service_mode: PaymentMode;
+  }> = {},
+): Promise<ApiResponse<GoApiImageResponse>> {
+  const describeResult = await describeImage(imageUrl, options);
+
+  if (!describeResult.success) {
+    return describeResult;
+  }
+
+  const taskId = describeResult.data?.data?.task_id;
+  if (!taskId) {
+    return {
+      success: false,
+      error: { message: 'Идентификатор задачи не получен из запроса на описание' },
     };
   }
 

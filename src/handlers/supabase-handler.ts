@@ -5,7 +5,7 @@ import type {
   UpdateUserData,
   UserStats,
   RequestType,
-} from '../types/index.js';
+} from '@/types/index.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
@@ -271,9 +271,14 @@ export async function updateUser(
  */
 export async function setPremium(telegramId: number): Promise<boolean> {
   try {
+    const now = new Date();
+    const premiumEndDate = new Date(now);
+    premiumEndDate.setMonth(premiumEndDate.getMonth() + 1);
+
     const result = await updateUser(telegramId, {
       is_premium: true,
-      premium_started_at: new Date().toISOString(),
+      premium_started_at: now.toISOString(),
+      premium_end_date: premiumEndDate.toISOString(),
     });
     return result !== null;
   } catch (error) {
@@ -304,7 +309,7 @@ export async function decreaseRequests(
   amount = 1,
 ): Promise<number | null> {
   try {
-    const user = await findUser(telegramId);
+    const user = await findUserWithExpirationCheck(telegramId);
     if (!user) {
       console.error('User not found for request decrease');
       return null;
@@ -312,7 +317,7 @@ export async function decreaseRequests(
     const quotaRow = await getOrCreateCurrentQuotaRow(String(user.id));
     if (!quotaRow) return null;
     const column = mapRequestTypeToColumn(requestType);
-    const newUsed = Math.max(0, (quotaRow as any)[column] + amount);
+    const newUsed = Math.max(0, (quotaRow[column as keyof typeof quotaRow] as number) + amount);
     const updateRes = await supabase
       .from('user_quotas')
       .update({ [column]: newUsed })
@@ -346,7 +351,7 @@ export async function getRemainingRequests(
   requestType: RequestType,
 ): Promise<number | null> {
   try {
-    const user = await findUser(telegramId);
+    const user = await findUserWithExpirationCheck(telegramId);
     if (!user) return null;
     const limits = getLimits(!!user.is_premium);
     const quotaRow = await getOrCreateCurrentQuotaRow(String(user.id));
@@ -405,29 +410,28 @@ export function hasRequestsLeft(user: DbUser | null, requestType: RequestType): 
  */
 export async function getUserStats(telegramId: number): Promise<UserStats | null> {
   try {
-    const user = await findUser(telegramId);
+    const user = await findUserWithExpirationCheck(telegramId);
     if (!user) return null;
     const limits = getLimits(!!user.is_premium);
     const quotaRow = await getOrCreateCurrentQuotaRow(String(user.id));
     const textUsed = quotaRow?.text_used ?? 0;
     const imageUsed = quotaRow?.image_used ?? 0;
     const videoUsed = quotaRow?.video_used ?? 0;
-    const createdRaw: any = (user as any).created_at;
-    const updatedRaw: any = (user as any).updated_at ?? createdRaw;
+    const createdRaw = user.created_at;
+    const updatedRaw = user.updated_at ?? createdRaw;
     const created_at =
       typeof createdRaw === 'string' ? createdRaw : new Date(createdRaw).toISOString();
     const updated_at =
       typeof updatedRaw === 'string' ? updatedRaw : new Date(updatedRaw).toISOString();
-    const modeRaw: any = (user as any).current_mode;
-    const current_mode = modeRaw;
+    const current_mode = user.current_mode as 'text' | 'photo' | 'video';
     return {
-      telegram_id: (user as any).telegram_id,
+      telegram_id: Number(user.telegram_id),
       current_mode,
       text_req_left: Math.max(0, limits.text - textUsed),
       image_req_left: Math.max(0, limits.image - imageUsed),
       video_req_left: Math.max(0, limits.video - videoUsed),
-      is_premium: !!(user as any).is_premium,
-      accepted_terms: !!(user as any).accepted_terms,
+      is_premium: !!user.is_premium,
+      accepted_terms: !!user.accepted_terms,
       created_at,
       updated_at,
     };
@@ -442,7 +446,7 @@ export async function getUserStats(telegramId: number): Promise<UserStats | null
  */
 export async function resetUserRequests(telegramId: number, isPremium = false): Promise<boolean> {
   try {
-    const user = await findUser(telegramId);
+    const user = await findUserWithExpirationCheck(telegramId);
     if (!user) return false;
     const quotaRow = await getOrCreateCurrentQuotaRow(String(user.id));
     if (!quotaRow) return false;
@@ -507,6 +511,128 @@ export async function deleteUser(telegramId: number): Promise<boolean> {
   } catch (error) {
     console.error('Unexpected error deleting user:', error);
     return false;
+  }
+}
+
+/**
+ * Check if user's premium has expired
+ */
+export async function checkPremiumExpired(telegramId: number): Promise<boolean> {
+  try {
+    const user = await findUser(telegramId);
+    if (!user || !user.is_premium || !user.premium_end_date) {
+      return false; // Not premium or no end date set
+    }
+
+    const now = new Date();
+    const endDate = new Date(user.premium_end_date);
+    return now > endDate;
+  } catch (error) {
+    console.error('Error checking premium expiration:', error);
+    return false;
+  }
+}
+
+/**
+ * Expire premium for a specific user
+ */
+export async function expirePremium(telegramId: number): Promise<boolean> {
+  try {
+    const result = await updateUser(telegramId, {
+      is_premium: false,
+      premium_end_date: null,
+    });
+
+    if (result) {
+      console.log(`Premium expired for user ${telegramId}`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error expiring premium:', error);
+    return false;
+  }
+}
+
+/**
+ * Check and expire all users with expired premium
+ */
+export async function checkAndExpireAllPremium(): Promise<{ expired: number; errors: number }> {
+  try {
+    // Get all premium users with end dates
+    const { data: premiumUsers, error } = await supabase
+      .from('gpt_tg_users')
+      .select('telegram_id, premium_end_date')
+      .eq('is_premium', true)
+      .not('premium_end_date', 'is', null);
+
+    if (error) {
+      console.error('Error fetching premium users:', error);
+      return { expired: 0, errors: 1 };
+    }
+
+    if (!premiumUsers || premiumUsers.length === 0) {
+      return { expired: 0, errors: 0 };
+    }
+
+    const now = new Date();
+    let expiredCount = 0;
+    let errorCount = 0;
+
+    for (const user of premiumUsers) {
+      try {
+        const endDate = new Date(user.premium_end_date);
+        if (now > endDate) {
+          const success = await expirePremium(Number(user.telegram_id));
+          if (success) {
+            expiredCount++;
+          } else {
+            errorCount++;
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing user ${user.telegram_id}:`, error);
+        errorCount++;
+      }
+    }
+
+    console.log(
+      `Premium expiration check completed: ${expiredCount} expired, ${errorCount} errors`,
+    );
+    return { expired: expiredCount, errors: errorCount };
+  } catch (error) {
+    console.error('Error in bulk premium expiration check:', error);
+    return { expired: 0, errors: 1 };
+  }
+}
+
+/**
+ * Get user with automatic premium expiration check
+ */
+export async function findUserWithExpirationCheck(telegramId: number): Promise<DbUser | null> {
+  try {
+    const user = await findUser(telegramId);
+    if (!user) return null;
+
+    // Check if premium has expired and update if needed
+    if (user.is_premium && user.premium_end_date) {
+      const now = new Date();
+      const endDate = new Date(user.premium_end_date);
+
+      if (now > endDate) {
+        console.log(`Premium expired for user ${telegramId}, updating status`);
+        const updatedUser = await updateUser(telegramId, {
+          is_premium: false,
+          premium_end_date: null,
+        });
+        return updatedUser;
+      }
+    }
+
+    return user;
+  } catch (error) {
+    console.error('Error in findUserWithExpirationCheck:', error);
+    return null;
   }
 }
 

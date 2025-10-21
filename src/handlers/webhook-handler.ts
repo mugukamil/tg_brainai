@@ -1,17 +1,18 @@
-import type { TelegramLikeBot } from '../tg-client.js';
-import fastify from 'fastify';
+import type { TelegramLikeBot } from '@/tg-client.js';
+import fastify, { FastifyInstance, FastifyRequest } from 'fastify';
+import type { TelegramUpdate } from '@/types/index.js';
 import {
   handleTextMessage,
   handleVoiceMessage,
-  handlePhotoMessage,
   handleCallbackQuery,
   handlePreCheckoutQuery,
   handleSuccessfulPaymentMessage,
-} from './msg-handler.js';
+  handlePhotoMessage,
+} from '@/handlers/msg-handler.js';
 
 export interface WebhookHandler {
   getStatus(): Promise<{
-    webhook?: any;
+    webhook?: Record<string, unknown>;
     local?: {
       webhookUrl: string | null;
       ngrokUrl: string | null;
@@ -28,8 +29,10 @@ export class WebhookHandler implements WebhookHandler {
   private bot: TelegramLikeBot;
   private webhookUrl: string | null = null;
   private ngrokUrl: string | null = null;
-  private ngrokListener: any = null;
-  private app: any = null;
+  private ngrokListener: unknown = null;
+  private app: FastifyInstance | null = null;
+  private processedUpdateIds: Set<number> = new Set();
+  private readonly MAX_PROCESSED_IDS = 1000; // Keep last 1000 update IDs in memory
 
   constructor(bot: TelegramLikeBot) {
     this.bot = bot;
@@ -46,7 +49,7 @@ export class WebhookHandler implements WebhookHandler {
     baseUrl?: string;
   }): Promise<void> {
     const port = options?.port ?? 3000;
-    const useNgrok = options?.useNgrok !== false; // default true
+    const useNgrok = options?.useNgrok !== false;
     const baseUrl = options?.baseUrl;
 
     try {
@@ -71,14 +74,17 @@ export class WebhookHandler implements WebhookHandler {
         // Start ngrok tunnel
         console.log('🌐 Starting ngrok tunnel...');
         const ngrok = await import('@ngrok/ngrok');
-        this.ngrokListener = await ngrok.connect({
+        const ngrokConfig: any = {
           addr: port,
-          authtoken: process.env.NGROK_AUTHTOKEN,
-        } as any);
+        };
+        if (process.env.NGROK_AUTHTOKEN) {
+          ngrokConfig.authtoken = process.env.NGROK_AUTHTOKEN;
+        }
+        this.ngrokListener = await ngrok.connect(ngrokConfig);
         this.ngrokUrl =
-          typeof this.ngrokListener?.url === 'function'
-            ? this.ngrokListener.url()
-            : String(this.ngrokListener?.url ?? '');
+          typeof (this.ngrokListener as any)?.url === 'function'
+            ? (this.ngrokListener as any).url()
+            : String((this.ngrokListener as any)?.url ?? '');
         console.log(`✅ Ngrok tunnel established: ${this.ngrokUrl}`);
 
         // Set webhook URL via ngrok
@@ -97,7 +103,6 @@ export class WebhookHandler implements WebhookHandler {
       // Configure webhook with Telegram
       await this.setWebhook();
 
-      console.log('🎉 Webhook setup complete!');
       console.log(`📡 Webhook URL: ${this.webhookUrl}`);
       if (this.ngrokUrl) {
         console.log(`🔍 Health check: ${this.ngrokUrl}/health`);
@@ -120,7 +125,7 @@ export class WebhookHandler implements WebhookHandler {
 
     const registerRoutes = (prefix: string) => {
       // Health check endpoint
-      this.app.get(`${prefix}/health`, async () => {
+      this.app!.get(`${prefix}/health`, async () => {
         return {
           status: 'ok',
           timestamp: new Date().toISOString(),
@@ -130,19 +135,22 @@ export class WebhookHandler implements WebhookHandler {
       });
 
       // Main webhook endpoint
-      this.app.post(`${prefix}/webhook`, async (request: any) => {
-        const update = request.body;
-        try {
-          await this.processUpdate(update);
-          return { ok: true };
-        } catch (error) {
-          console.error('Webhook processing error:', error);
-          throw error;
-        }
-      });
+      this.app!.post(
+        `${prefix}/webhook`,
+        async (request: FastifyRequest<{ Body: TelegramUpdate }>) => {
+          const update = request.body;
+          try {
+            await this.processUpdate(update);
+            return { ok: true };
+          } catch (error) {
+            console.error('Webhook processing error:', error);
+            throw error;
+          }
+        },
+      );
 
       // API docs endpoint
-      this.app.get(`${prefix}/docs`, async () => {
+      this.app!.get(`${prefix}/docs`, async () => {
         return {
           message: 'BrainAI Bot Webhook API',
           endpoints: {
@@ -163,7 +171,7 @@ export class WebhookHandler implements WebhookHandler {
     }
   }
 
-  private async processUpdate(update: any): Promise<void> {
+  private async processUpdate(update: TelegramUpdate): Promise<void> {
     console.log('=== WEBHOOK UPDATE RECEIVED ===');
     console.log('Update ID:', update.update_id);
     console.log(
@@ -174,18 +182,36 @@ export class WebhookHandler implements WebhookHandler {
     );
     console.log('Full update:', JSON.stringify(update, null, 2));
 
+    // Check if we've already processed this update ID
+    const updateId = update.update_id;
+    if (this.processedUpdateIds.has(updateId)) {
+      console.log(`⚠️ Duplicate update ${updateId} detected - skipping processing`);
+      return; // Return successfully so Telegram doesn't resend
+    }
+
+    // Mark this update as processed
+    this.processedUpdateIds.add(updateId);
+
+    // Prevent memory leak by limiting the size of the Set
+    if (this.processedUpdateIds.size > this.MAX_PROCESSED_IDS) {
+      // Remove oldest entries (convert to array, remove first items, recreate Set)
+      const idsArray = Array.from(this.processedUpdateIds);
+      const keepIds = idsArray.slice(-this.MAX_PROCESSED_IDS);
+      this.processedUpdateIds = new Set(keepIds);
+    }
+
     try {
       if (update.message) {
         const msg = update.message;
 
         if (msg.successful_payment) {
-          await handleSuccessfulPaymentMessage(this.bot as any, msg);
+          await handleSuccessfulPaymentMessage(this.bot as any, msg as any);
         } else if (msg.text) {
-          await handleTextMessage(this.bot as any, msg);
-        } else if (msg.voice) {
-          await handleVoiceMessage(this.bot as any, msg);
+          await handleTextMessage(this.bot as any, msg as any);
         } else if (msg.photo) {
-          await handlePhotoMessage(this.bot as any, msg);
+          await handlePhotoMessage(this.bot as any, msg as any);
+        } else if (msg.voice) {
+          await handleVoiceMessage(this.bot as any, msg as any);
         }
       }
 
@@ -207,6 +233,18 @@ export class WebhookHandler implements WebhookHandler {
         stack: (error as any)?.stack,
         update: JSON.stringify(update, null, 2),
       });
+
+      // Import the helper at the top of the file:
+      // import { isBotBlockedError } from './handler-utils.js';
+
+      // Don't re-throw if user blocked the bot - we want to return 200 OK
+      const { isBotBlockedError } = await import('./handler-utils.js');
+      if (isBotBlockedError(error)) {
+        console.log('⚠️ Ignoring update from blocked user to prevent retry loop');
+        return; // Return successfully so Telegram stops resending this update
+      }
+
+      // Re-throw other errors
       throw error;
     }
   }
@@ -274,8 +312,8 @@ export class WebhookHandler implements WebhookHandler {
       console.log('✅ Webhook removed');
 
       // Close ngrok tunnel
-      if (this.ngrokListener?.close) {
-        await this.ngrokListener.close();
+      if (this.ngrokListener && (this.ngrokListener as any).close) {
+        await (this.ngrokListener as any).close();
         console.log('✅ Ngrok tunnel closed');
       }
 

@@ -1,4 +1,5 @@
 import type { TelegramLikeBot as TelegramBot } from '../tg-client.js';
+import type { TelegramCallbackQuery } from '@/types/index.js';
 import { getUserStats } from './supabase-handler.js';
 
 export async function showTermsOfService(
@@ -26,7 +27,10 @@ export async function hasAcceptedTerms(userId: number): Promise<boolean> {
   return userStats ? userStats.accepted_terms : false;
 }
 
-export function handleTermsCallback(_bot: TelegramBot, _callbackQuery: any): Promise<boolean> {
+export function handleTermsCallback(
+  _bot: TelegramBot,
+  _callbackQuery: TelegramCallbackQuery,
+): Promise<boolean> {
   return Promise.resolve(false);
 }
 

@@ -1,12 +1,12 @@
 import {
   handleTextMessage,
   handleVoiceMessage,
-  handlePhotoMessage,
   handleCallbackQuery,
   handlePreCheckoutQuery,
   handleSuccessfulPaymentMessage,
-} from './handlers/msg-handler.js';
-import { TgBotAdapter, TgMessage, TgCallbackQuery, TgPreCheckoutQuery } from './tg-client.js';
+  handlePhotoMessage,
+} from '@/handlers/msg-handler.js';
+import { TgBotAdapter, TgMessage, TgCallbackQuery, TgPreCheckoutQuery } from '@/tg-client.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN as string;
 
@@ -52,23 +52,22 @@ export function startBotWebhook(): TgBotAdapter {
  * @param bot - Bot instance
  */
 export function setupBotHandlers(bot: TgBotAdapter): void {
-  // Handle regular messages
   bot.on('message', async (msg: TgMessage) => {
+    console.log('RECEIVECD MESSAGE');
+    console.log(msg);
     try {
-      // Handle successful payment
       if (msg.successful_payment) {
         console.log('Получен успешный платеж:', msg.successful_payment);
-        await handleSuccessfulPaymentMessage(bot, msg);
+        await handleSuccessfulPaymentMessage(bot, msg as any);
         return;
       }
 
-      // Handle different message types
       if (msg.text) {
-        await handleTextMessage(bot, msg);
+        await handleTextMessage(bot, msg as any);
       } else if (msg.voice) {
-        await handleVoiceMessage(bot, msg);
+        await handleVoiceMessage(bot, msg as any);
       } else if (msg.photo) {
-        await handlePhotoMessage(bot, msg);
+        await handlePhotoMessage(bot, msg as any);
       } else if (msg.video_note ?? msg.video) {
         // Handle video messages
         await bot.sendMessage(
@@ -123,7 +122,7 @@ export function setupBotHandlers(bot: TgBotAdapter): void {
   // Handle callback queries (inline button presses)
   bot.on('callback_query', async (callbackQuery: TgCallbackQuery) => {
     try {
-      await handleCallbackQuery(bot, callbackQuery);
+      await handleCallbackQuery(bot, callbackQuery as any);
     } catch (error) {
       console.error('Error handling callback query:', error);
       try {
@@ -141,7 +140,7 @@ export function setupBotHandlers(bot: TgBotAdapter): void {
   bot.on('pre_checkout_query', async (preCheckoutQuery: TgPreCheckoutQuery) => {
     try {
       console.log('Pre-checkout query received:', preCheckoutQuery);
-      await handlePreCheckoutQuery(bot, preCheckoutQuery);
+      await handlePreCheckoutQuery(bot, preCheckoutQuery as any);
     } catch (error) {
       console.error('Error handling pre-checkout query:', error);
       try {

@@ -40,11 +40,12 @@ class SetupVerifier {
     return existsSync(join(this.projectRoot, path));
   }
 
-  private readJsonFile(path: string): any {
+  private readJsonFile(path: string): Record<string, unknown> | null {
     try {
       const content = readFileSync(join(this.projectRoot, path), 'utf8');
       return JSON.parse(content);
     } catch (error) {
+      console.error(`❌ Failed to read ${path}:`, error);
       return null;
     }
   }
@@ -195,7 +196,10 @@ class SetupVerifier {
       '@typescript-eslint/parser',
     ];
 
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    const deps = {
+      ...(pkg?.dependencies || {}),
+      ...(pkg?.devDependencies || {}),
+    };
     const missing = [...requiredDeps, ...requiredDevDeps].filter(dep => !deps[dep]);
 
     if (missing.length === 0) {
@@ -273,7 +277,8 @@ class SetupVerifier {
     }
 
     // Check for ES modules configuration
-    if (compilerOptions.module === 'ESNext' && compilerOptions.moduleResolution === 'Node') {
+    const compilerOpts = compilerOptions as any;
+    if (compilerOpts.module === 'ESNext' && compilerOpts.moduleResolution === 'Node') {
       this.addResult({
         name: 'ES Modules Config',
         status: 'pass',
@@ -281,10 +286,9 @@ class SetupVerifier {
       });
     } else {
       this.addResult({
-        name: 'ES Modules Config',
+        name: 'TypeScript Configuration',
         status: 'warn',
-        message: 'ES modules not properly configured',
-        details: 'Set module: "ESNext" and moduleResolution: "Node"',
+        message: 'Missing required compiler options (module, moduleResolution)',
       });
     }
   }

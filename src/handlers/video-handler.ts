@@ -4,7 +4,7 @@ import type {
   VideoGenerationResponse,
   ApiResponse,
   ValidationResult,
-} from '../types/index.js';
+} from '@/types/index.js';
 
 const GOAPI_API_KEY = process.env.GOAPI_API_KEY;
 
@@ -66,15 +66,16 @@ export async function generateVideo(
     }
     console.log('Selected mode based on version:', { apiVersion, mode });
 
-    const body: any = {
+    const body: Record<string, unknown> = {
       model: 'kling',
-      task_type: 'video_generation',
+      task_type: options.image_url ? 'image_to_video' : 'video_generation',
       input: {
         prompt: prompt.trim(),
         negative_prompt: '',
         cfg_scale: 0.5,
-        duration,
-        aspect_ratio,
+        duration: duration,
+        aspect_ratio: aspect_ratio,
+        image_url: options.image_url,
         camera_control: {
           type: 'simple',
           config: {
@@ -94,7 +95,7 @@ export async function generateVideo(
     };
 
     // Build config only when provided to satisfy enum validation
-    const config: { service_mode?: string; webhook_config?: any } = {};
+    const config: { service_mode?: string; webhook_config?: Record<string, unknown> } = {};
     if (options.additionalParams?.service_mode) {
       config.service_mode = options.additionalParams.service_mode;
     }
@@ -106,17 +107,16 @@ export async function generateVideo(
     }
 
     try {
-      const response = await goapi.post<any>('/task', body);
+      const response = await goapi.post<Record<string, unknown>>('/task', body);
       console.log('=== VIDEO GENERATION RESPONSE ===');
       console.log('Status:', response.status);
       console.log('Response data:', JSON.stringify(response.data, null, 2));
-      const data = response.data;
+      const data = response.data as any;
       return {
         success: true,
         data: {
           prediction_id: data.data.task_id,
           status: mapKlingStatus(data.data.status),
-          urls: { get: `/task/${data.data.task_id}`, cancel: '' },
         },
       };
     } catch (innerError) {
@@ -165,7 +165,9 @@ export async function generateVideo(
   }
 }
 
-export async function getPredictionStatus(predictionId: string): Promise<ApiResponse<any>> {
+export async function getPredictionStatus(
+  predictionId: string,
+): Promise<ApiResponse<Record<string, unknown>>> {
   try {
     const response = await goapi.get(`/task/${predictionId}`);
     const data = response.data?.data;
@@ -194,7 +196,6 @@ export async function getPredictionStatus(predictionId: string): Promise<ApiResp
 
     const videoUrl = works[0]?.video?.resource_without_watermark ?? works[0]?.video?.resource;
     console.log('Selected video URL:', videoUrl);
-    console.log('URL extension:', videoUrl ? videoUrl.split('.').pop()?.split('?')[0] : 'none');
 
     return {
       success: true,
@@ -228,7 +229,7 @@ export async function getPredictionStatus(predictionId: string): Promise<ApiResp
   }
 }
 
-export function parseVideoCommand(text: string): VideoGenerationParams {
+export function parseVideoCommand(text: string, image_url?: string): VideoGenerationParams {
   return {
     prompt: text,
     resolution: '720p',
@@ -238,6 +239,7 @@ export function parseVideoCommand(text: string): VideoGenerationParams {
       version: '1.6',
       mode: 'std',
     },
+    image_url,
   };
 }
 

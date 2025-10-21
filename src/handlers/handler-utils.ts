@@ -5,7 +5,8 @@ import type {
   ImageGenerationParams,
   ProcessingMode,
   TelegramReplyKeyboard,
-} from '../types/index.js';
+  SendMessageOptions,
+} from '@/types/index.js';
 
 export const ongoingTasks = new Map<number, boolean>();
 
@@ -93,5 +94,76 @@ export async function safeEditMessageText(
       return;
     }
     console.error('editMessageText failed:', error);
+  }
+}
+
+export const helpMessage = `📖 **Справка по BrainAI Bot**
+
+        🖼 **Команды режима фотографий:**
+        • Отправьте любой текст для генерации 4 изображений
+
+        🎬 **Команды режима видео:**
+        • Отправьте текст для генерации видео
+
+        💬 **Команды текстового режима:**
+        • Отправьте любое сообщение для чата с ИИ
+        • Отправляйте голосовые сообщения (автоматическая транскрипция)
+        • Отправляйте изображения с подписями для анализа
+
+        ⚡ **Быстрые команды:**
+        /photo - Переключиться в режим изображений
+        /text - Переключиться в текстовый режим
+        /video - Переключиться в режим видео
+        /imageinfo - Информация о текущем провайдере
+        /status - Проверить использование
+        /help - Показать эту справку`;
+
+export const commandAliases = {
+  '📝 ChatGPT': '/text',
+  '🎨 Генерация изображений': '/photo',
+  '🎬 Генерация видео': '/video',
+  '✨ Премиум': '/pay',
+};
+
+/**
+ * Check if an error is due to the user blocking the bot
+ */
+export function isBotBlockedError(error: unknown): boolean {
+  const errorObj = error as {
+    description?: string;
+    message?: string;
+    code?: number;
+  };
+
+  // Check for 403 error code
+  if (errorObj.code === 403) {
+    return true;
+  }
+
+  // Check for "bot was blocked" in description or message
+  const errorText = errorObj.description || errorObj.message || '';
+  return /bot was blocked by the user/i.test(errorText);
+}
+
+/**
+ * Safely send a message without throwing on blocked users
+ * Returns true if message was sent, false if user blocked the bot
+ */
+export async function safeSendMessage(
+  bot: TelegramBot,
+  chatId: number,
+  text: string,
+  options?: SendMessageOptions,
+): Promise<boolean> {
+  try {
+    await bot.sendMessage(chatId, text, options);
+    return true;
+  } catch (error) {
+    if (isBotBlockedError(error)) {
+      console.log(`⚠️ User ${chatId} has blocked the bot. Skipping message.`);
+      return false;
+    }
+    // Re-throw other errors
+    throw error;
   }
 }

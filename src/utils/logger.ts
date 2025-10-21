@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { insertInteractionLog } from '../handlers/supabase-handler.js';
+import { insertInteractionLog } from '@/handlers/supabase-handler.js';
 
 type Direction = 'user' | 'bot' | 'system';
 type ContentType = 'text' | 'image' | 'voice' | 'video' | 'callback' | 'other';
