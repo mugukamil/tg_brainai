@@ -92,7 +92,7 @@ async function startDevelopment(): Promise<void> {
       process.exit(1);
     });
 
-    process.on('unhandledRejection', async (reason: any, promise: Promise<any>) => {
+    process.on('unhandledRejection', async (reason: unknown, promise: Promise<unknown>) => {
       console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
       try {
         await webhookHandler.stop();

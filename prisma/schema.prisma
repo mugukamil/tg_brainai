@@ -25,6 +25,7 @@ model gpt_tg_users {
   updated_at         DateTime      @default(now()) @db.Timestamptz(6)
   premium_started_at DateTime?     @db.Timestamptz(6)
   free_period_start  DateTime?     @db.Date
+  image_provider     String?       @default("goapi") @db.VarChar(10)
   user_quotas        user_quotas[]
 
   @@index([telegram_id], map: "idx_gpt_tg_users_telegram_id")

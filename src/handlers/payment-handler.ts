@@ -5,8 +5,8 @@ import type {
   TgCallbackQuery,
 } from '../tg-client.js';
 import { setPremium, getUserStats } from './supabase-handler.js';
-import type { PaymentInvoice } from '../types/index.js';
-import { logInteraction } from '../utils/logger.js';
+import type { PaymentInvoice } from '@/types/index.js';
+import { logInteraction } from '@/utils/logger.js';
 import axios from 'axios';
 
 /**
@@ -181,9 +181,12 @@ export async function handlePreCheckout(
   } catch (error) {
     console.error('Error handling pre-checkout:', error);
     console.error('Error details:', {
-      message: (error as any)?.message,
-      stack: (error as any)?.stack,
-      response: (error as any)?.response,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      response:
+        typeof error === 'object' && error !== null && 'response' in error
+          ? error.response
+          : undefined,
     });
     await bot.answerPreCheckoutQuery(preCheckoutQuery.id, false, {
       error_message: 'Внутренняя ошибка сервера',
@@ -457,25 +460,25 @@ export async function checkPaymentStatus(
 
     const keyboard = userStats.is_premium
       ? {
-        inline_keyboard: [
-          [
-            {
-              text: '📊 Обновить статистику',
-              callback_data: JSON.stringify({ action: 'refresh_stats' }),
-            },
+          inline_keyboard: [
+            [
+              {
+                text: '📊 Обновить статистику',
+                callback_data: JSON.stringify({ action: 'refresh_stats' }),
+              },
+            ],
           ],
-        ],
-      }
+        }
       : {
-        inline_keyboard: [
-          [
-            {
-              text: '⭐ Купить Премиум',
-              callback_data: JSON.stringify({ action: 'buy_premium' }),
-            },
+          inline_keyboard: [
+            [
+              {
+                text: '⭐ Купить Премиум',
+                callback_data: JSON.stringify({ action: 'buy_premium' }),
+              },
+            ],
           ],
-        ],
-      };
+        };
 
     await bot.sendMessage(chatId, statusMessage, {
       parse_mode: 'Markdown',

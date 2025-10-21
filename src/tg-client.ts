@@ -1,6 +1,6 @@
 import { TelegramClient } from 'telegramsjs';
 
-import type { Message, CallbackQuery, PreCheckoutQuery, User } from '@telegram.ts/types';
+import type { Message, CallbackQuery, PreCheckoutQuery } from '@telegram.ts/types';
 
 type ChatAction =
   | 'typing'
@@ -62,7 +62,7 @@ export class TgBotAdapter {
 
   on(event: EventName, handler: (payload: any) => void): void {
     if (event === 'message') {
-      this.client.on('message', (m: any) => handler(this.mapMessage(m)) as any);
+      this.client.on('message', (m: any) => handler(this.mapMessage(m as any)) as any);
       return;
     }
     if (event === 'callbackQuery' || event === 'callback_query') {
@@ -209,19 +209,23 @@ export class TgBotAdapter {
 
   async getFileLink(fileId: string): Promise<string> {
     const file: any = await this.client.getFile(fileId);
+    console.log('FILE');
+    console.log(file);
     const token = this.token;
-    const filePath: string = file?.file_path ?? file?.filePath ?? file?.file?.file_path ?? '';
+    const filePath: string = file?.path;
     return `https://api.telegram.org/file/bot${token}/${filePath}`;
   }
 
   async editMessageText(
     text: string,
-    params: { chat_id: number; message_id: number },
+    params: { chat_id: number; message_id: number; parse_mode?: string; reply_markup?: any },
   ): Promise<void> {
     await this.client.editMessageText({
       chatId: params.chat_id,
       messageId: params.message_id,
       text,
+      parseMode: params.parse_mode,
+      replyMarkup: params.reply_markup,
     } as any);
   }
 
@@ -305,12 +309,12 @@ export class TgBotAdapter {
 
   async getMe(): Promise<{ id: number; username?: string; first_name?: string }> {
     const user = await this.client.getMe();
-    const u = user as unknown as User;
+    const u = user as any;
     return {
-      id: (u as any).id,
-      username: (u as any).username,
-      first_name: (u as any).first_name,
-    } as any;
+      id: u.id,
+      username: u.username,
+      first_name: u.first_name,
+    };
   }
 
   async getWebHookInfo(): Promise<{ url?: string; allowed_updates?: string[] }> {
@@ -324,13 +328,13 @@ export class TgBotAdapter {
       method: 'GET',
     });
 
-    const result = (await response.json()) as any;
+    const result = (await response.json()) as Record<string, unknown>;
     if (!result.ok) {
       console.error('Failed to get webhook info:', result);
       return { url: '' };
     }
 
-    const webhookInfo = result.result;
+    const webhookInfo = result.result as any;
     console.log(
       '📊 Webhook allowed updates:',
       webhookInfo.allowed_updates ?? 'default (messages only)',
@@ -339,7 +343,7 @@ export class TgBotAdapter {
     return {
       url: webhookInfo.url,
       allowed_updates: webhookInfo.allowed_updates,
-    } as any;
+    };
   }
 
   async setWebHook(url: string): Promise<boolean> {
@@ -375,7 +379,7 @@ export class TgBotAdapter {
       }),
     });
 
-    const result = (await response.json()) as any;
+    const result = (await response.json()) as Record<string, unknown>;
     if (!result.ok) {
       console.error('Failed to set webhook:', result);
       throw new Error(`Failed to set webhook: ${result.description ?? 'Unknown error'}`);

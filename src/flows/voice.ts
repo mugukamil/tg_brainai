@@ -1,10 +1,10 @@
-import type { TelegramLikeBot as TelegramBot } from '../../tg-client.js';
-import { findUser, canConsumeRequest, getUserStats } from '../supabase-handler.js';
-import { showTermsOfService, hasAcceptedTerms } from '../terms-handler.js';
-import { transcribeAudio } from '../openai-handler.js';
+import type { TelegramLikeBot as TelegramBot } from '../tg-client.js';
+import type { TelegramMessage } from '@/types/index.js';
+import { findUser, canConsumeRequest, getUserStats } from '@/handlers/supabase-handler.js';
+import { transcribeAudio } from '@/handlers/openai-handler.js';
 import { handleTextGeneration } from './text.js';
 
-export async function handleVoiceMessage(bot: TelegramBot, msg: any): Promise<void> {
+export async function handleVoiceMessage(bot: TelegramBot, msg: TelegramMessage): Promise<void> {
   const chatId = msg.chat.id;
   const userId = msg.from?.id;
   if (!userId) return;
@@ -18,11 +18,6 @@ export async function handleVoiceMessage(bot: TelegramBot, msg: any): Promise<vo
         chatId,
         `❌ Нет запросов. Осталось: Текст ${stats?.text_req_left ?? 0}`,
       );
-      return;
-    }
-    const termsAccepted = await hasAcceptedTerms(userId);
-    if (!termsAccepted) {
-      await showTermsOfService(bot, chatId, userId);
       return;
     }
     await bot.sendChatAction(chatId, 'typing');

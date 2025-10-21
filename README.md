@@ -12,12 +12,14 @@ A comprehensive Telegram bot that provides AI-powered text generation, image cre
 - **Smart Responses**: Contextual AI responses with markdown formatting
 
 ### 🎨 Photo Mode (Image Generation)
-- **AI Image Generation**: Create stunning images using Midjourney via GoAPI
+- **Dual Provider Support**: Choose between GoAPI (Midjourney) and fal.ai (Nano Banana)
+- **GoAPI (Midjourney)**: Artistic, stylized images with upscaling and variations
+- **fal.ai (Nano Banana)**: Fast, photorealistic images with excellent text understanding
+- **Provider Switching**: Use `/provider` command to switch between image generators
 - **Advanced Parameters**: Support for aspect ratios, processing modes, and quality settings
-- **Batch Generation**: Generate 4 unique images in a 2x2 grid
-- **Image Actions**: Upscale individual images from the grid
+- **Batch Generation**: Generate multiple images (provider-dependent)
 - **Real-time Progress**: Live status tracking with visual progress indicators
-- **Parameter Support**: `--ar 16:9`, `--fast`, `--turbo`, `--relax`
+- **Parameter Support**: `--ar 16:9`, `--fast`, `--turbo`, `--relax` (GoAPI)
 
 ### 🎬 Video Mode (Video Generation)
 - **AI Video Generation**: Create videos using Replicate's advanced models
@@ -46,6 +48,58 @@ A comprehensive Telegram bot that provides AI-powered text generation, image cre
 - **Rate Limiting**: Intelligent request management and quota enforcement
 - **Keyboard UI**: Custom reply keyboards for easy mode switching
 - **Multi-language**: Russian language support throughout the interface
+
+## 🆚 Image Generation Providers
+
+| Feature | GoAPI (Midjourney) | fal.ai (Nano Banana) |
+|---------|-------------------|-------------------|
+| **Style** | Artistic, stylized | Photorealistic |
+| **Speed** | Moderate (10-30s) | Fast (3-10s) |
+| **Text Understanding** | Good | Excellent |
+| **Image Editing** | ✅ Yes | ❌ No (text-to-image only) |
+| **Photo + Caption** | ✅ Supported | ❌ Not supported |
+| **Upscaling** | ✅ Yes | ❌ No |
+| **Variations** | ✅ Yes | ❌ No |
+| **Aspect Ratios** | Many options | 5 options |
+| **Best For** | Art, creative imagery | Photos, realistic scenes |
+
+**Switching Providers**: Use `/provider` command in the bot to choose your preferred image generator.
+
+**⚠️ Important**: fal.ai (Nano Banana) does **not** support image-to-image editing. If you send a photo with a caption, the bot will show an error message. Use GoAPI for image editing, or send text-only prompts with fal.ai. See [PROVIDER_LIMITATIONS.md](./PROVIDER_LIMITATIONS.md) for details.
+
+## 🚀 Quick Start with fal.ai
+
+To enable fal.ai (Nano Banana) image generation:
+
+### 1. Get fal.ai API Key
+1. Visit [fal.ai](https://fal.ai/) and create an account
+2. Generate an API key from your dashboard
+3. Add to your `.env` file:
+```env
+FAL_KEY=your_fal_api_key_here
+```
+
+### 2. Update Database (if needed)
+Add the `image_provider` column to support provider switching:
+```sql
+ALTER TABLE gpt_tg_users ADD COLUMN image_provider VARCHAR(10) DEFAULT 'goapi';
+```
+
+### 3. Test Integration
+```bash
+npm run test:fal                    # Test without generation
+npm run test:fal -- --generate      # Test with actual generation
+```
+
+### 4. Switch Provider in Bot
+- Send `/provider` to choose between GoAPI and fal.ai
+- Or use `/fal` to switch directly to fal.ai
+- Use `/imageinfo` to see current provider details
+
+### 5. Start Generating
+1. Switch to photo mode: `🎨 Генерация изображений`
+2. Send any text prompt
+3. Enjoy fast, photorealistic results!
 
 ## 🚀 Quick Start
 
@@ -259,6 +313,7 @@ SUPABASE_ANON_KEY=           # Supabase anonymous key
 **Optional:**
 ```env
 REPLICATE_API_TOKEN=         # For video generation
+FAL_KEY=                     # fal.ai API key for Nano Banana (alternative to GoAPI)
 DEFAULT_TEXT_REQUESTS=100    # Free plan text limit
 DEFAULT_IMAGE_REQUESTS=10    # Free plan image limit
 DEFAULT_VIDEO_REQUESTS=5     # Free plan video limit
@@ -277,6 +332,7 @@ CREATE TABLE gpt_tg_users (
     telegram_id BIGINT UNIQUE NOT NULL,
     openai_thread_id VARCHAR(255),
     current_mode VARCHAR(20) DEFAULT 'text_req_left',
+    image_provider VARCHAR(10) DEFAULT 'goapi',
     text_req_left INTEGER DEFAULT 100,
     image_req_left INTEGER DEFAULT 10,
     video_req_left INTEGER DEFAULT 5,
@@ -290,6 +346,79 @@ CREATE TABLE gpt_tg_users (
 CREATE INDEX idx_telegram_id ON gpt_tg_users(telegram_id);
 CREATE INDEX idx_premium_status ON gpt_tg_users(is_premium);
 CREATE INDEX idx_created_at ON gpt_tg_users(created_at);
+
+## Premium Subscription Management
+
+### Automatic Premium Expiration
+
+The bot automatically manages premium subscription expiration:
+
+- **Premium Duration**: 1 month from purchase date
+- **Automatic Expiration**: Premium status is automatically revoked when expired
+- **Real-time Checks**: Premium status is validated on each user interaction
+- **Scheduled Tasks**: Daily background task to expire all overdue subscriptions
+
+### Premium Expiration System
+
+#### Database Fields
+- `premium_started_at`: When premium was activated
+- `premium_end_date`: When premium expires (set to +1 month from start)
+- `is_premium`: Current premium status (automatically updated)
+
+#### Manual Commands
+
+```bash
+# Run premium expiration check manually
+npm run expire:premium
+
+# Run in development mode
+npm run expire:premium:dev
+
+# Test the expiration task
+npm run cron:test
+```
+
+#### Cron Job Setup
+
+Set up automatic daily premium expiration checks:
+
+```bash
+# Install daily cron job (runs at 2:00 AM)
+npm run cron:install
+
+# Check cron job status
+npm run cron:status
+
+# View recent logs
+npm run cron:logs
+
+# Remove cron job
+npm run cron:remove
+```
+
+#### Manual Cron Setup
+
+If you prefer manual cron setup, add this to your crontab:
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add this line (adjust paths as needed):
+0 2 * * * cd /path/to/tg-brainai && node dist/tasks/expire-premium.js >> logs/cron-expire-premium.log 2>&1
+```
+
+#### Monitoring
+
+- **Logs**: Premium expiration activities are logged to `logs/cron-expire-premium.log`
+- **PM2**: Task can be monitored via PM2 if using the included ecosystem config
+- **Database**: Check `gpt_tg_users` table for premium status and dates
+
+#### Troubleshooting
+
+1. **Premium not expiring**: Check if cron job is running and logs for errors
+2. **Manual expiration**: Use `npm run expire:premium` to manually expire overdue subscriptions
+3. **Database issues**: Verify `premium_end_date` field is properly set when users purchase premium
 ```
 
 ## 🚨 Error Handling

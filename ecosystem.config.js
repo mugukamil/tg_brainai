@@ -9,10 +9,10 @@ module.exports = {
       watch: false,
       max_memory_restart: '1G',
       env: {
-        NODE_ENV: 'development'
+        NODE_ENV: 'development',
       },
       env_production: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
       },
       error_file: './logs/err.log',
       out_file: './logs/out.log',
@@ -24,7 +24,7 @@ module.exports = {
       min_uptime: '10s',
       kill_timeout: 5000,
       listen_timeout: 8000,
-      restart_delay: 4000
+      restart_delay: 4000,
     },
     {
       name: 'tg-brainai-webhook',
@@ -37,12 +37,12 @@ module.exports = {
       env: {
         NODE_ENV: 'development',
         PORT: 3000,
-        USE_NGROK: 'false'
+        USE_NGROK: 'false',
       },
       env_production: {
         NODE_ENV: 'production',
         PORT: process.env.PORT || 3000,
-        USE_NGROK: 'false'
+        USE_NGROK: 'false',
       },
       error_file: './logs/webhook-err.log',
       out_file: './logs/webhook-out.log',
@@ -54,7 +54,7 @@ module.exports = {
       min_uptime: '10s',
       kill_timeout: 5000,
       listen_timeout: 8000,
-      restart_delay: 4000
+      restart_delay: 4000,
     },
     {
       name: 'tg-brainai-dev',
@@ -66,11 +66,11 @@ module.exports = {
       watch: ['src'],
       ignore_watch: ['node_modules', 'logs', 'dist'],
       watch_options: {
-        followSymlinks: false
+        followSymlinks: false,
       },
       max_memory_restart: '512M',
       env: {
-        NODE_ENV: 'development'
+        NODE_ENV: 'development',
       },
       error_file: './logs/dev-err.log',
       out_file: './logs/dev-out.log',
@@ -80,7 +80,7 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       max_restarts: 10,
       min_uptime: '5s',
-      kill_timeout: 3000
+      kill_timeout: 3000,
     },
     {
       name: 'tg-brainai-webhook-dev',
@@ -92,12 +92,12 @@ module.exports = {
       watch: ['src'],
       ignore_watch: ['node_modules', 'logs', 'dist'],
       watch_options: {
-        followSymlinks: false
+        followSymlinks: false,
       },
       max_memory_restart: '512M',
       env: {
         NODE_ENV: 'development',
-        PORT: 3001
+        PORT: 3001,
       },
       error_file: './logs/webhook-dev-err.log',
       out_file: './logs/webhook-dev-out.log',
@@ -107,8 +107,29 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       max_restarts: 10,
       min_uptime: '5s',
-      kill_timeout: 3000
-    }
+      kill_timeout: 3000,
+    },
+    {
+      name: 'tg-brainai-expire-premium',
+      script: 'dist/tasks/expire-premium.js',
+      cwd: './tg-brainai',
+      instances: 1,
+      autorestart: false,
+      watch: false,
+      max_memory_restart: '256M',
+      env: {
+        NODE_ENV: 'production',
+      },
+      error_file: './logs/expire-premium-err.log',
+      out_file: './logs/expire-premium-out.log',
+      log_file: './logs/expire-premium-combined.log',
+      time: true,
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_restarts: 0,
+      min_uptime: '1s',
+      kill_timeout: 3000,
+    },
   ],
 
   deploy: {
@@ -119,8 +140,9 @@ module.exports = {
       repo: 'git@github.com:mugukamil/tg-brainai.git',
       path: '/var/www/tg-brainai',
       'pre-deploy-local': '',
-      'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env production',
-      'pre-setup': ''
-    }
-  }
+      'post-deploy':
+        'npm install && npm run build && pm2 reload ecosystem.config.js --env production',
+      'pre-setup': '',
+    },
+  },
 };

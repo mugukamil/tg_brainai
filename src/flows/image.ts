@@ -1,7 +1,14 @@
-import type { TelegramLikeBot as TelegramBot } from '../../tg-client.js';
-import type { ProcessingMode, PaymentMode } from '../../types/index.js';
-import { generateImage, getTaskStatus } from '../goapi-handler.js';
-import { decreaseRequests, canConsumeRequest, getUserStats } from '../supabase-handler.js';
+import type { TelegramLikeBot as TelegramBot } from '../tg-client.js';
+import type {
+  ProcessingMode,
+  PaymentMode,
+  ImageProvider,
+  TelegramMessage,
+  FileOptions,
+} from '@/types/index.js';
+import { generateImage, getTaskStatus } from '@/handlers/goapi-handler.js';
+import { handleFalPhotoGeneration } from './image-fal.js';
+import { decreaseRequests, canConsumeRequest, getUserStats } from '@/handlers/supabase-handler.js';
 import {
   createMainKeyboard,
   fetchImageBuffer,
@@ -9,15 +16,40 @@ import {
   ongoingTasks,
   safeEditMessageText,
   parseImageCommand,
-} from '../handler-utils.js';
-import { logInteraction } from '../../utils/logger.js';
+} from '@/handlers/handler-utils.js';
+import { logInteraction } from '@/utils/logger.js';
+import { findOrCreate } from '@/findOrCreate.js';
 
-export async function handlePhotoGeneration(bot: TelegramBot, msg: any): Promise<void> {
+export async function handlePhotoGeneration(bot: TelegramBot, msg: TelegramMessage): Promise<void> {
   const chatId = msg.chat.id;
   const userId = msg.from?.id;
   const text = msg.text;
+  const caption = msg.caption;
+  const photoId = msg.photo ? msg.photo[msg.photo.length - 1]!.file_id : null;
+  const image_url = photoId ? await bot.getFileLink(photoId) : undefined;
 
-  if (!userId || !text) {
+  if (!userId || (!text && !caption)) {
+    return;
+  }
+
+  // Get user to check preferred image provider
+  const user = await findOrCreate(userId);
+  if (!user) {
+    await bot.sendMessage(chatId, '❌ Не удалось получить информацию о пользователе.');
+    return;
+  }
+
+  // Get the user's preferred image provider
+  const imageProvider: ImageProvider = (user as any).image_provider || 'goapi';
+
+  // Route to appropriate handler based on provider
+  if (imageProvider === 'fal-ai') {
+    await handleFalPhotoGeneration(bot, msg);
+    return;
+  }
+
+  // Continue with goapi implementation for backward compatibility
+  if (!text) {
     return;
   }
 
@@ -39,7 +71,7 @@ export async function handlePhotoGeneration(bot: TelegramBot, msg: any): Promise
     return;
   }
 
-  const params = parseImageCommand(text);
+  const params = parseImageCommand(text ?? caption);
   if (!params.prompt || params.prompt.length < 3) {
     await bot.sendMessage(
       chatId,
@@ -57,6 +89,8 @@ export async function handlePhotoGeneration(bot: TelegramBot, msg: any): Promise
       process_mode: params.process_mode as ProcessingMode,
       skip_prompt_check: params.skip_prompt_check,
       service_mode: params.service_mode as PaymentMode,
+      task_type: 'describe',
+      ...(image_url && { image_url }),
     });
 
     if (!generateResult.success) {
@@ -115,7 +149,9 @@ export async function handlePhotoGeneration(bot: TelegramBot, msg: any): Promise
           if (imageUrl) {
             try {
               const { buffer, filename, contentType } = await fetchImageBuffer(imageUrl);
-              const fileOptions: any = contentType ? { filename, contentType } : { filename };
+              const fileOptions: FileOptions = contentType
+                ? { filename, contentType }
+                : { filename };
               await bot.sendPhoto(
                 chatId,
                 buffer,

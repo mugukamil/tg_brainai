@@ -1,13 +1,13 @@
-import type { TelegramLikeBot as TelegramBot } from '../../tg-client.js';
-import { canConsumeRequest, decreaseRequests, getUserStats } from '../supabase-handler.js';
-import { createMessage, getAssistantResponse } from '../openai-handler.js';
-import { createMainKeyboard } from '../handler-utils.js';
-import { logInteraction } from '../../utils/logger.js';
-import { DbUser } from '../../types/index.js';
+import type { TelegramLikeBot as TelegramBot } from '../tg-client.js';
+import { canConsumeRequest, decreaseRequests, getUserStats } from '@/handlers/supabase-handler.js';
+import { createMessage, getAssistantResponse } from '@/handlers/openai-handler.js';
+import { createMainKeyboard } from '@/handlers/handler-utils.js';
+import { logInteraction } from '@/utils/logger.js';
+import { DbUser, TelegramMessage } from '@/types/index.js';
 
 export async function handleTextGeneration(
   bot: TelegramBot,
-  msg: any,
+  msg: TelegramMessage,
   user: DbUser,
 ): Promise<void> {
   const chatId = msg.chat.id;
@@ -52,7 +52,7 @@ export async function handleTextGeneration(
   }
 }
 
-export async function handleVoiceMessage(bot: TelegramBot, msg: any): Promise<void> {
+export async function handleVoiceMessage(bot: TelegramBot, msg: TelegramMessage): Promise<void> {
   const chatId = msg.chat.id;
   const userId = msg.from?.id;
   if (!userId) return;
