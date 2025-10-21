@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "bun dist/index.js",
     "dev": "tsx watch src/index.ts",
     "dev:webhook": "tsx src/dev-webhook.ts",
     "webhook:server": "tsx src/webhook-server.ts",
@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "build:prod": "npm run clean && npm run build",
+    "build:prod": "bun run clean && bun run build",
+    "test-docker": "docker build -t tg-brainai-test . && echo 'Docker build successful!'",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
     "prisma:generate": "prisma generate",
@@ -31,8 +32,8 @@
     "pm2:prod": "./scripts/pm2-dev.sh prod",
     "pm2:status": "./scripts/pm2-dev.sh status",
     "pm2:clean": "./scripts/pm2-dev.sh clean",
-    "dev:pm2": "npm run pm2:dev",
-    "webhook:pm2": "npm run pm2:webhook",
+    "dev:pm2": "bun run pm2:dev",
+    "webhook:pm2": "bun run pm2:webhook",
     "expire:premium": "node dist/tasks/expire-premium.js",
     "expire:premium:dev": "tsx src/tasks/expire-premium.ts",
     "cron:install": "./scripts/setup-cron.sh install",
@@ -92,7 +93,7 @@
   },
   "engines": {
     "node": ">=16.0.0",
-    "npm": ">=8.0.0"
+    "bun": ">=1.0.0"
   },
   "repository": {
     "type": "git",
